@@ -29,6 +29,64 @@ export class Game {
   private bledaPosition = { x: 0, z: 15 };
   private bledaVelocity = { x: 0 };
   
+  // Shot tracking
+  private shotsFired = 0;
+  private shotsHit = 0;
+  
+  // L33t roast messages based on accuracy
+  private roastMessages = [
+    '|| N00B D3T3CT3D ||',
+    '>> ST0RMT00P3R A1M <<',
+    '[[ BL1ND M0NK3Y ]]',
+    '** P0T4T0 A1M **',
+    '~~ TR4SH T13R ~~',
+    '## W0RST A1M NA ##',
+    '++ UN1NST4LL PLS ++',
+    ':: 404 SK1LL N0T F0UND ::',
+    '<< MY GR4NDM4 B3TT3R >>',
+    '|| 4RML3SS W0ND3R ||',
+    '-- 1NC0MP3T3NT --',
+    '** SPR4Y & PR4Y **',
+    '~~ BR0K3N M0US3? ~~',
+    '>> D3L3T3 G4M3 <<',
+    '[[ C4NT H1T W4T3R ]]',
+    ':: FR0M 0C34N ::',
+    '++ B0T C0NF1RM3D ++',
+    '## W4ST3 0F 4RR0WS ##',
+    '<< N3G4T1V3 K/D >>',
+    '|| CL0WN M0D3 ||',
+    '== P41NF7L T0 W4TCH ==',
+    '>> R3T1R3 PLS <<',
+    '[[ 3MB4RR4SS1NG ]]',
+    '~~ G1T R3KT K1D ~~',
+    '** TRY F1NG3R P41NT **',
+    '++ U N33D GL4SS3S? ++',
+    ':: A1M H4CKS BR0K3N ::',
+    '|| Y0U S33 TH4T? ||',
+    '<< N0 H0P3 4 U >>',
+    '## M1SS3D 4G41N ##',
+    '-- P4TH3T1C --',
+    '** U PL4Y BL1NDF0LD3D? **',
+    '~~ 0% 4CCUR4CY ~~',
+    '[[ TRY B1GG3R T4RG3T ]]',
+    '>> USE B0TH 3Y3S <<',
+    '++ D1D U 3V3N TRY? ++',
+    ':: M4YB3 G0 H0M3 ::',
+    '|| T1M3 2 QU1T ||',
+    '<< L3FT H4ND3D? >>',
+    '## PL4Y1NG W/ F33T? ##',
+    '== 1M4G1N3 B31NG TH1S B4D ==',
+    '** 1TST T1M3 US1NG M0US3? **',
+    '~~ D0NT QU1T D4Y J0B ~~',
+    '[[ M0NK3Y S33 M0NK3Y M1SS ]]',
+    '>> L1K3 4 BL1ND SN1P3R <<',
+    '++ W0RST PL4Y3R 3U ++',
+    ':: M4YB3 TRY C4NDY CRUSH ::',
+    '|| 4UT0-41M BR0K3N ||',
+    '<< D3L3T3 SYST3M32 >>',
+    '## 7N1NST4LL L1F3 ##'
+  ];
+  
   // L33t messages
   private l33tMessages = [
     '|| H34DSH0T ||',
@@ -555,6 +613,10 @@ export class Game {
   }
   
   private shoot(): void {
+    // Increment shots fired
+    this.shotsFired++;
+    this.updateKDDisplay();
+    
     // Find an inactive arrow or create a new one
     let arrow = this.arrows.find(a => !a.active);
     if (!arrow) {
@@ -606,8 +668,10 @@ export class Game {
         arrow.mesh.position.y = -100; // Hide arrow
         
         this.score++;
+        this.shotsHit++;
         this.wheelSpeed *= 1.2; // Increase wheel speed
         this.updateScore();
+        this.updateKDDisplay();
         this.showCongratsMessage(); // Show l33t message
         
         // Flash effect
@@ -705,6 +769,87 @@ export class Game {
     `;
     
     document.body.appendChild(uiContainer);
+    
+    // Create K/D ratio display with roasts
+    const kdContainer = document.createElement('div');
+    kdContainer.style.position = 'absolute';
+    kdContainer.style.top = '10px';
+    kdContainer.style.left = '50%';
+    kdContainer.style.transform = 'translateX(-50%)';
+    kdContainer.style.width = '400px';
+    kdContainer.style.background = 'linear-gradient(135deg, rgba(20,0,0,0.95) 0%, rgba(40,0,0,0.9) 100%)';
+    kdContainer.style.border = '2px solid #ff0000';
+    kdContainer.style.borderRadius = '0';
+    kdContainer.style.boxShadow = '0 0 30px rgba(255,0,0,0.5), inset 0 0 30px rgba(255,0,0,0.2)';
+    kdContainer.style.padding = '15px';
+    kdContainer.style.fontFamily = 'Courier New, monospace';
+    kdContainer.style.textAlign = 'center';
+    kdContainer.style.pointerEvents = 'none';
+    
+    kdContainer.innerHTML = `
+      <div style="color: #ff0000; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 10px;">
+        [[ K/D R4T10 ]]
+      </div>
+      <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
+        <div style="flex: 1;">
+          <div style="color: #ff6600; font-size: 11px; text-transform: uppercase;">SH0TS F1R3D</div>
+          <div id="shots-fired" style="font-size: 28px; color: #ff6600; text-shadow: 0 0 10px #ff6600; font-weight: bold;">0</div>
+        </div>
+        <div style="flex: 1;">
+          <div style="color: #00ff00; font-size: 11px; text-transform: uppercase;">H1TS</div>
+          <div id="shots-hit" style="font-size: 28px; color: #00ff00; text-shadow: 0 0 10px #00ff00; font-weight: bold;">0</div>
+        </div>
+        <div style="flex: 1;">
+          <div style="color: #ffff00; font-size: 11px; text-transform: uppercase;">4CCUR4CY</div>
+          <div id="accuracy" style="font-size: 28px; color: #ffff00; text-shadow: 0 0 10px #ffff00; font-weight: bold;">0%</div>
+        </div>
+      </div>
+      <div id="roast-message" style="color: #ff0000; font-size: 18px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; text-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; min-height: 30px;">
+        || W41T1NG 4 U 2 M1SS ||
+      </div>
+    `;
+    
+    document.body.appendChild(kdContainer);
+    
+    // Add glitch effect for roast messages
+    const kdStyle = document.createElement('style');
+    kdStyle.textContent = `
+      @keyframes roastGlitch {
+        0%, 100% { 
+          transform: translateX(0);
+          filter: hue-rotate(0deg);
+        }
+        10% { 
+          transform: translateX(-1px);
+          filter: hue-rotate(10deg);
+        }
+        20% { 
+          transform: translateX(1px);
+          filter: hue-rotate(-10deg);
+        }
+        30% { 
+          transform: translateX(-1px);
+          filter: hue-rotate(5deg);
+        }
+        40% { 
+          transform: translateX(1px);
+          filter: hue-rotate(-5deg);
+        }
+        50% { 
+          transform: translateX(0);
+          filter: hue-rotate(0deg);
+        }
+      }
+      
+      #roast-message {
+        animation: roastGlitch 0.5s ease-in-out infinite;
+      }
+      
+      #roast-message.new-roast {
+        animation: roastGlitch 0.2s ease-in-out 5;
+      }
+    `;
+    document.head.appendChild(kdStyle);
     
     // Create l33t RPM indicator
     const rpmContainer = document.createElement('div');
@@ -986,6 +1131,80 @@ export class Game {
     const scoreElement = document.getElementById('score');
     if (scoreElement) {
       scoreElement.textContent = `Score: ${this.score}`;
+    }
+  }
+  
+  private updateKDDisplay(): void {
+    // Update shots fired
+    const shotsFiredElement = document.getElementById('shots-fired');
+    if (shotsFiredElement) {
+      shotsFiredElement.textContent = this.shotsFired.toString();
+    }
+    
+    // Update shots hit
+    const shotsHitElement = document.getElementById('shots-hit');
+    if (shotsHitElement) {
+      shotsHitElement.textContent = this.shotsHit.toString();
+    }
+    
+    // Calculate and update accuracy
+    const accuracy = this.shotsFired > 0 ? (this.shotsHit / this.shotsFired) * 100 : 0;
+    const accuracyElement = document.getElementById('accuracy');
+    if (accuracyElement) {
+      accuracyElement.textContent = `${accuracy.toFixed(1)}%`;
+      
+      // Color code accuracy
+      if (accuracy >= 80) {
+        accuracyElement.style.color = '#00ff00';
+        accuracyElement.style.textShadow = '0 0 10px #00ff00';
+      } else if (accuracy >= 60) {
+        accuracyElement.style.color = '#88ff00';
+        accuracyElement.style.textShadow = '0 0 10px #88ff00';
+      } else if (accuracy >= 40) {
+        accuracyElement.style.color = '#ffff00';
+        accuracyElement.style.textShadow = '0 0 10px #ffff00';
+      } else if (accuracy >= 20) {
+        accuracyElement.style.color = '#ff8800';
+        accuracyElement.style.textShadow = '0 0 10px #ff8800';
+      } else {
+        accuracyElement.style.color = '#ff0000';
+        accuracyElement.style.textShadow = '0 0 10px #ff0000';
+      }
+    }
+    
+    // Update roast message based on accuracy and shots fired
+    const roastElement = document.getElementById('roast-message');
+    if (roastElement && this.shotsFired >= 3) { // Start roasting after 3 shots
+      let roastMessage = '';
+      
+      if (accuracy < 20) {
+        // Brutal roasts for terrible accuracy
+        roastMessage = this.roastMessages[Math.floor(Math.random() * 20)];
+      } else if (accuracy < 40) {
+        // Medium roasts
+        roastMessage = this.roastMessages[20 + Math.floor(Math.random() * 15)];
+      } else if (accuracy < 60) {
+        // Light roasts
+        roastMessage = this.roastMessages[35 + Math.floor(Math.random() * 10)];
+      } else if (accuracy < 80) {
+        // Mild taunts
+        roastMessage = this.roastMessages[45 + Math.floor(Math.random() * 5)];
+      } else {
+        // Still roast them even if they're good
+        roastMessage = '|| 2 E-Z 4 U? ||';
+      }
+      
+      // Apply roast with animation
+      roastElement.textContent = roastMessage;
+      roastElement.classList.remove('new-roast');
+      // Force reflow
+      roastElement.offsetHeight;
+      roastElement.classList.add('new-roast');
+      
+      // Remove animation class after it completes
+      setTimeout(() => {
+        roastElement.classList.remove('new-roast');
+      }, 1000);
     }
   }
   
