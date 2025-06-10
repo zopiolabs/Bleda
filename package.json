@@ -1,6 +1,6 @@
 {
   "name": "bleda",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Bleda game project",
   "main": "dist/main.js",
   "scripts": {
@@ -10,7 +10,11 @@
     "type-check": "tsc --noEmit",
     "release": "npm version patch && git push --follow-tags"
   },
-  "keywords": ["game", "threejs", "typescript"],
+  "keywords": [
+    "game",
+    "threejs",
+    "typescript"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
