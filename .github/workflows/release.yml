@@ -51,39 +51,29 @@ jobs:
           skip-version-file: false
           skip-on-empty: false
 
-      - name: Create Release
-        id: create_release
-        if: ${{ steps.changelog.outputs.skipped == 'false' }}
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.changelog.outputs.tag }}
-          release_name: ${{ steps.changelog.outputs.tag }}
-          body: ${{ steps.changelog.outputs.clean_changelog }}
-          draft: false
-          prerelease: false
-
       - name: Create game bundle
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
         run: |
           cd dist
-          zip -r ../bleda-game-${{ steps.changelog.outputs.tag || github.event.inputs.version || 'latest' }}.zip .
+          zip -r ../bleda-game-${{ steps.changelog.outputs.tag }}.zip .
           cd ..
 
-      - name: Upload Release Asset
+      - name: Create Release with Asset
         if: ${{ steps.changelog.outputs.skipped == 'false' }}
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./bleda-game-${{ steps.changelog.outputs.tag }}.zip
-          asset_name: bleda-game-${{ steps.changelog.outputs.tag }}.zip
-          asset_content_type: application/zip
+        run: |
+          gh release create ${{ steps.changelog.outputs.tag }} \
+            --title "${{ steps.changelog.outputs.tag }}" \
+            --notes "${{ steps.changelog.outputs.clean_changelog }}" \
+            ./bleda-game-${{ steps.changelog.outputs.tag }}.zip
 
   deploy-production:
     needs: release
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
       - name: Checkout
