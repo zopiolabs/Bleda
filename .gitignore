@@ -6,7 +6,7 @@ dist/
 build/
 
 # IDE files
-.vscode/
+# .vscode/ # We also provide a .vscode folder with some basic settings for Visual Studio Code
 .idea/
 
 # OS files

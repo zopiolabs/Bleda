@@ -1,0 +1,100 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev Server",
+      "type": "npm",
+      "script": "dev",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Build Production",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "detail": "Build the project for production"
+    },
+    {
+      "label": "Preview Production Build",
+      "type": "npm",
+      "script": "preview",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      },
+      "detail": "Preview the production build locally"
+    },
+    {
+      "label": "Type Check",
+      "type": "npm",
+      "script": "type-check",
+      "problemMatcher": "$tsc",
+      "group": "test",
+      "detail": "Run TypeScript type checking"
+    },
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      },
+      "detail": "Install npm dependencies"
+    },
+    {
+      "label": "Clean Build",
+      "type": "shell",
+      "command": "rm -rf dist node_modules && npm install && npm run build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      },
+      "detail": "Clean build - removes dist and node_modules, then reinstalls and builds"
+    },
+    {
+      "label": "Update Dependencies",
+      "type": "shell",
+      "command": "npm update",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      },
+      "detail": "Update all npm dependencies to their latest compatible versions"
+    },
+    {
+      "label": "Open in Browser",
+      "type": "shell",
+      "command": "open http://localhost:5173",
+      "windows": {
+        "command": "start http://localhost:5173"
+      },
+      "linux": {
+        "command": "xdg-open http://localhost:5173"
+      },
+      "problemMatcher": [],
+      "detail": "Open the dev server in default browser"
+    },
+    {
+      "label": "Watch TypeScript",
+      "type": "shell",
+      "command": "npx tsc --watch --noEmit",
+      "problemMatcher": "$tsc-watch",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "detail": "Watch TypeScript files for errors"
+    }
+  ]
+}
