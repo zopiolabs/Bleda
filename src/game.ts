@@ -600,12 +600,149 @@ export class Game {
     `;
     
     document.body.appendChild(uiContainer);
+    
+    // Create l33t RPM indicator
+    const rpmContainer = document.createElement('div');
+    rpmContainer.style.position = 'absolute';
+    rpmContainer.style.top = '10px';
+    rpmContainer.style.right = '10px';
+    rpmContainer.style.width = '250px';
+    rpmContainer.style.height = '150px';
+    rpmContainer.style.background = 'linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.8) 100%)';
+    rpmContainer.style.border = '2px solid #00ff00';
+    rpmContainer.style.borderRadius = '10px';
+    rpmContainer.style.boxShadow = '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.2)';
+    rpmContainer.style.padding = '15px';
+    rpmContainer.style.fontFamily = 'Courier New, monospace';
+    rpmContainer.style.pointerEvents = 'none';
+    
+    rpmContainer.innerHTML = `
+      <div style="color: #00ff00; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+        [[ WHEEL RPM ]]
+      </div>
+      <div id="rpm-display" style="font-size: 48px; color: #00ff00; text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00; font-weight: bold; text-align: center;">
+        0000
+      </div>
+      <div style="margin-top: 10px;">
+        <div style="background: #111; height: 10px; border-radius: 5px; overflow: hidden; border: 1px solid #00ff00;">
+          <div id="rpm-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #00ff00 0%, #ffff00 50%, #ff0000 100%); transition: width 0.1s ease-out; box-shadow: 0 0 10px currentColor;"></div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #00ff00;">
+        <span>0</span>
+        <span style="color: #ffff00;">25</span>
+        <span style="color: #ff0000;">50</span>
+      </div>
+    `;
+    
+    document.body.appendChild(rpmContainer);
+    
+    // Add pulsing animation CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px); }
+        75% { transform: translateX(2px); }
+      }
+      @keyframes glitch {
+        0%, 100% { 
+          text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        }
+        20% { 
+          text-shadow: -2px 0 #ff0000, 2px 0 #00ff00, 0 0 10px currentColor;
+        }
+        40% { 
+          text-shadow: 2px 0 #ff0000, -2px 0 #00ff00, 0 0 10px currentColor;
+        }
+      }
+      #rpm-display {
+        animation: pulse 0.5s ease-in-out infinite;
+      }
+      #rpm-display.danger {
+        animation: pulse 0.2s ease-in-out infinite, shake 0.1s ease-in-out infinite, glitch 0.3s ease-in-out infinite;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Add warning text element
+    const warningText = document.createElement('div');
+    warningText.id = 'rpm-warning';
+    warningText.style.position = 'absolute';
+    warningText.style.top = '170px';
+    warningText.style.right = '10px';
+    warningText.style.width = '250px';
+    warningText.style.textAlign = 'center';
+    warningText.style.color = '#ff0000';
+    warningText.style.fontFamily = 'Courier New, monospace';
+    warningText.style.fontSize = '14px';
+    warningText.style.textTransform = 'uppercase';
+    warningText.style.letterSpacing = '2px';
+    warningText.style.display = 'none';
+    warningText.style.pointerEvents = 'none';
+    warningText.innerHTML = '⚠️ DANGER ZONE ⚠️';
+    warningText.style.textShadow = '0 0 10px #ff0000';
+    document.body.appendChild(warningText);
   }
   
   private updateScore(): void {
     const scoreElement = document.getElementById('score');
     if (scoreElement) {
       scoreElement.textContent = `Score: ${this.score}`;
+    }
+  }
+  
+  private updateRPM(): void {
+    // Calculate RPM from wheel speed (radians per second to RPM)
+    // wheelSpeed is in rad/s, convert to rotations/minute: (rad/s) * (60s/min) / (2π rad/rotation)
+    const actualRPM = Math.abs(this.wheelSpeed * 60 / (2 * Math.PI));
+    // Display RPM rounded to nearest integer
+    const displayRPM = Math.round(actualRPM);
+    
+    // Update RPM display
+    const rpmDisplay = document.getElementById('rpm-display');
+    if (rpmDisplay) {
+      // Pad with zeros for l33t look
+      rpmDisplay.textContent = displayRPM.toString().padStart(4, '0');
+      
+      // Change color based on RPM
+      if (displayRPM < 10) {
+        rpmDisplay.style.color = '#00ff00';
+        rpmDisplay.style.textShadow = '0 0 10px #00ff00, 0 0 20px #00ff00';
+        rpmDisplay.classList.remove('danger');
+      } else if (displayRPM < 20) {
+        rpmDisplay.style.color = '#ffff00';
+        rpmDisplay.style.textShadow = '0 0 10px #ffff00, 0 0 20px #ffff00';
+        rpmDisplay.classList.remove('danger');
+      } else {
+        rpmDisplay.style.color = '#ff0000';
+        rpmDisplay.style.textShadow = '0 0 10px #ff0000, 0 0 20px #ff0000';
+        rpmDisplay.classList.add('danger');
+      }
+      
+      // Update animation speed
+      rpmDisplay.style.animationDuration = displayRPM > 20 ? '0.2s' : '0.5s';
+      
+      // Show/hide warning text
+      const warningText = document.getElementById('rpm-warning');
+      if (warningText) {
+        warningText.style.display = displayRPM > 30 ? 'block' : 'none';
+        if (displayRPM > 30) {
+          warningText.style.animation = 'pulse 0.3s ease-in-out infinite';
+        }
+      }
+    }
+    
+    // Update RPM bar
+    const rpmBar = document.getElementById('rpm-bar');
+    if (rpmBar) {
+      const percentage = Math.min(displayRPM / 50 * 100, 100);
+      rpmBar.style.width = percentage + '%';
     }
   }
   
@@ -656,6 +793,9 @@ export class Game {
     
     // Rotate wheel around Z-axis (like a ferris wheel or wheel of fortune)
     this.wheel.rotation.z += this.wheelSpeed * deltaTime;
+    
+    // Update RPM display
+    this.updateRPM();
     
     // Update arrows
     this.arrows.forEach(arrow => {
