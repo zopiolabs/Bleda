@@ -29,6 +29,110 @@ export class Game {
   private bledaPosition = { x: 0, z: 15 };
   private bledaVelocity = { x: 0 };
   
+  // L33t messages
+  private l33tMessages = [
+    '|| H34DSH0T ||',
+    '>> N0SC0P3D <<',
+    '[[ ULT1M4T3 ]]',
+    '** FL4WL3SS **',
+    '~~ P3RF3CT10N ~~',
+    '## M4ST3RFU1 ##',
+    '++ G0DL1K3 ++',
+    ':: 3P1C W1N ::',
+    '<< L3G3ND4RY >>',
+    '|| D0M1N4T3D ||',
+    '-- UNST0PP4BL3 --',
+    '** 3L1T3 SN1P3R **',
+    '~~ M4X SK1LLZ ~~',
+    '>> PWN3D 1T <<',
+    '[[ H4X0R3D ]]',
+    ':: N1NJ4 M0D3 ::',
+    '++ SUP3R C0MB0 ++',
+    '## 0V3RK1LL ##',
+    '<< M3G4 STR1K3 >>',
+    '|| PR0 G4M3R ||',
+    '== B00M SH0T ==',
+    '>> 360 N0 SC0P3 <<',
+    '[[ CR1T1C4L H1T ]]',
+    '~~ W1CK3D S1CK ~~',
+    '** B34ST M0D3 **',
+    '++ M0NST3R K1LL ++',
+    ':: FR4G M4ST3R ::',
+    '|| 1337 SK1LLZ ||',
+    '<< T0T4L PWN4G3 >>',
+    '## H34VY H1TT3R ##',
+    '-- K1LLT4CUL4R --',
+    '** R4MP4G3 **',
+    '~~ S4V4G3 ~~',
+    '[[ D34DLY 4CC ||',
+    '>> F4T4L1TY <<',
+    '++ H0LY SM0K3S ++',
+    ':: R3KT ::',
+    '|| N0 M3RCY ||',
+    '<< 1NST4 K1LL >>',
+    '## C4RN4G3 ##',
+    '== D3V4ST4T3D ==',
+    '** K1LL C0NF1RM3D **',
+    '~~ 3XPL0S1V3 ~~',
+    '[[ M4X1MUM P41N ]]',
+    '>> T3RM1N4T3D <<',
+    '++ D3M0L1SH3D ++',
+    ':: 4NN1H1L4T3D ::',
+    '|| SN1P3 G0D ||',
+    '<< CH40S M0D3 >>',
+    '## V1CT0RY ##',
+    '-- 3L1M1N4T3D --',
+    '** W4ST3D **',
+    '~~ F1N1SH H1M ~~',
+    '[[ G4M3 0V3R ]]',
+    '>> Y0U W1N <<',
+    '++ 3P1C F41L ++',
+    ':: N00B SL4Y3R ::',
+    '|| H4CK TH3 PL4N3T ||',
+    '<< CYB3R W4RR10R >>',
+    '## QU4D K1LL ##',
+    '== P3NT4 K1LL ==',
+    '** H3X4 K1LL **',
+    '~~ M3G4 C0MB0 ~~',
+    '[[ UNST0PP4BL3 ]]',
+    '>> R4G3 QU1T <<',
+    '++ TRY H4RD3R ++',
+    ':: G1T GUD ::',
+    '|| 2 3Z 4 U ||',
+    '<< N1C3 TRY K1D >>',
+    '## R3SP4WN L0L ##',
+    '-- G1T R3KT --',
+    '** U M4D BR0? **',
+    '~~ C4NT T0UCH TH1S ~~',
+    '[[ 1M 1N UR B4S3 ]]',
+    '>> K1LL1N UR D00DZ <<',
+    '++ 4LL UR B4S3 ++',
+    ':: B3L0NG 2 US ::',
+    '|| Z3R0 C00L ||',
+    '<< 4C1D BURN >>',
+    '## CR4SH 0V3RR1D3 ##',
+    '== H4CK TH3 G1BS0N ==',
+    '** M4TR1X M0D3 **',
+    '~~ D1G1T4L W4RR10R ~~',
+    '[[ CYB3R 3L1T3 ]]',
+    '>> V1RTU4L K1LL3R <<',
+    '++ P1X3L P3RF3CT ++',
+    ':: R3TR0 R4MP4G3 ::',
+    '|| 8-B1T B34ST ||',
+    '<< GL1TCH M0B >>',
+    '## L4G K1LL ##',
+    '-- P1NG 0F D34TH --',
+    '** N3TW0RK N1NJ4 **',
+    '~~ FR4M3 P3RF3CT ~~',
+    '[[ T1M3 GLITCH ]]',
+    '>> BUG 3XPL01T <<',
+    '++ C0D3 1NJ3CT3D ++',
+    ':: SYST3M H4CK3D ::',
+    '|| K3RN3L P4N1C ||',
+    '<< S3GF4ULT >>',
+    '## BUFF3R 0V3RFL0W ##'
+  ];
+  
   // Controls
   private keys = {
     left: false,
@@ -504,6 +608,7 @@ export class Game {
         this.score++;
         this.wheelSpeed *= 1.2; // Increase wheel speed
         this.updateScore();
+        this.showCongratsMessage(); // Show l33t message
         
         // Flash effect
         const ballMaterial = this.ball.material as THREE.MeshLambertMaterial;
@@ -688,6 +793,193 @@ export class Game {
     warningText.innerHTML = '⚠️ DANGER ZONE ⚠️';
     warningText.style.textShadow = '0 0 10px #ff0000';
     document.body.appendChild(warningText);
+    
+    // Create l33t congratulatory message container
+    const congratsContainer = document.createElement('div');
+    congratsContainer.id = 'congrats-container';
+    congratsContainer.style.position = 'absolute';
+    congratsContainer.style.top = '30%';
+    congratsContainer.style.left = '50%';
+    congratsContainer.style.transform = 'translate(-50%, -50%)';
+    congratsContainer.style.fontSize = '48px';
+    congratsContainer.style.fontFamily = 'Courier New, monospace';
+    congratsContainer.style.fontWeight = 'bold';
+    congratsContainer.style.color = '#00ff00';
+    congratsContainer.style.textShadow = `
+      0 0 10px #00ff00,
+      3px 3px 0 #008800,
+      6px 6px 0 #004400,
+      9px 9px 0 #002200,
+      12px 12px 15px rgba(0,0,0,0.8)
+    `;
+    congratsContainer.style.letterSpacing = '8px';
+    congratsContainer.style.textAlign = 'center';
+    congratsContainer.style.pointerEvents = 'none';
+    congratsContainer.style.opacity = '0';
+    congratsContainer.style.transform = 'translate(-50%, -50%) scale(0.5) rotate(-5deg)';
+    congratsContainer.style.transition = 'none';
+    congratsContainer.style.zIndex = '1000';
+    congratsContainer.style.background = 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 100%)';
+    congratsContainer.style.padding = '20px 40px';
+    congratsContainer.style.border = '3px solid #00ff00';
+    congratsContainer.style.borderRadius = '0';
+    congratsContainer.style.boxShadow = `
+      inset 0 0 50px rgba(0,255,0,0.3),
+      0 0 30px rgba(0,255,0,0.5),
+      0 0 60px rgba(0,255,0,0.3)
+    `;
+    congratsContainer.style.textTransform = 'uppercase';
+    congratsContainer.style.whiteSpace = 'nowrap';
+    congratsContainer.innerHTML = '<span class="congrats-text"></span>';
+    document.body.appendChild(congratsContainer);
+    
+    // Add additional CSS for congrats animation
+    const congratsStyle = document.createElement('style');
+    congratsStyle.textContent = `
+      @keyframes retroGlitch {
+        0% {
+          transform: translate(-50%, -50%) scale(1) rotate(0deg);
+          filter: hue-rotate(0deg);
+        }
+        10% {
+          transform: translate(-48%, -50%) scale(1) rotate(-1deg);
+          filter: hue-rotate(90deg) saturate(2);
+        }
+        20% {
+          transform: translate(-52%, -50%) scale(1.02) rotate(1deg);
+          filter: hue-rotate(180deg) saturate(3);
+        }
+        30% {
+          transform: translate(-50%, -48%) scale(1) rotate(0deg);
+          filter: hue-rotate(270deg) saturate(2);
+        }
+        40% {
+          transform: translate(-50%, -52%) scale(0.98) rotate(0deg);
+          filter: hue-rotate(0deg);
+        }
+        50% {
+          transform: translate(-49%, -50%) scale(1) rotate(0deg);
+          filter: hue-rotate(45deg);
+        }
+        60% {
+          transform: translate(-51%, -50%) scale(1.01) rotate(0deg);
+          filter: hue-rotate(0deg);
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1) rotate(0deg);
+          filter: hue-rotate(0deg);
+        }
+      }
+      
+      @keyframes scanlines {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: 0 10px;
+        }
+      }
+      
+      @keyframes textGlitch {
+        0%, 100% {
+          text-shadow: 
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        20% {
+          text-shadow: 
+            -2px 0 #ff0000,
+            2px 0 #00ffff,
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        40% {
+          text-shadow: 
+            2px 0 #ff00ff,
+            -2px 0 #ffff00,
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        60% {
+          text-shadow: 
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8),
+            0 0 30px #00ff00;
+        }
+      }
+      
+      #congrats-container {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+      }
+      
+      #congrats-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15),
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+        pointer-events: none;
+        animation: scanlines 8s linear infinite;
+      }
+      
+      #congrats-container.show {
+        animation: retroGlitch 0.4s ease-in-out infinite;
+      }
+      
+      #congrats-container.show .congrats-text {
+        animation: textGlitch 0.3s ease-in-out infinite;
+        display: inline-block;
+      }
+      
+      #congrats-container::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #00ff00, #00ff00 25%, transparent 25%, transparent 75%, #00ff00 75%);
+        z-index: -1;
+        opacity: 0.5;
+        filter: blur(1px);
+      }
+      
+      @keyframes screenShake {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-2px, -2px); }
+        20% { transform: translate(2px, -2px); }
+        30% { transform: translate(-2px, 2px); }
+        40% { transform: translate(2px, 2px); }
+        50% { transform: translate(-1px, -1px); }
+        60% { transform: translate(1px, -1px); }
+        70% { transform: translate(-1px, 1px); }
+        80% { transform: translate(1px, 1px); }
+        90% { transform: translate(0, 0); }
+      }
+    `;
+    document.head.appendChild(congratsStyle);
   }
   
   private updateScore(): void {
@@ -695,6 +987,73 @@ export class Game {
     if (scoreElement) {
       scoreElement.textContent = `Score: ${this.score}`;
     }
+  }
+  
+  private showCongratsMessage(): void {
+    const congratsContainer = document.getElementById('congrats-container');
+    if (!congratsContainer) return;
+    
+    const textElement = congratsContainer.querySelector('.congrats-text') as HTMLElement;
+    if (!textElement) return;
+    
+    // Pick a random l33t message
+    const randomMessage = this.l33tMessages[Math.floor(Math.random() * this.l33tMessages.length)];
+    textElement.textContent = randomMessage;
+    
+    // Random color scheme for retro feel
+    const colorSchemes = [
+      { main: '#00ff00', border: '#00ff00' }, // Classic green
+      { main: '#00ffff', border: '#00ffff' }, // Cyan
+      { main: '#ff00ff', border: '#ff00ff' }, // Magenta
+      { main: '#ffff00', border: '#ffff00' }, // Yellow
+      { main: '#ff8800', border: '#ff8800' }  // Orange
+    ];
+    const scheme = colorSchemes[Math.floor(Math.random() * colorSchemes.length)];
+    textElement.style.color = scheme.main;
+    congratsContainer.style.borderColor = scheme.border;
+    congratsContainer.style.boxShadow = `
+      inset 0 0 50px ${scheme.main}33,
+      0 0 30px ${scheme.main}80,
+      0 0 60px ${scheme.main}4D
+    `;
+    
+    // Show with animation
+    congratsContainer.style.transition = 'none';
+    congratsContainer.style.opacity = '0';
+    congratsContainer.style.transform = 'translate(-50%, -50%) scale(0.5) rotate(-5deg)';
+    congratsContainer.classList.remove('show');
+    
+    // Force reflow
+    congratsContainer.offsetHeight;
+    
+    // Animate in with retro effect
+    congratsContainer.style.transition = 'all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+    congratsContainer.style.opacity = '1';
+    congratsContainer.style.transform = 'translate(-50%, -50%) scale(1) rotate(0deg)';
+    congratsContainer.classList.add('show');
+    
+    // Add screen shake effect
+    const gameContainer = document.getElementById('game-container');
+    if (gameContainer) {
+      gameContainer.style.animation = 'screenShake 0.3s ease-in-out';
+      setTimeout(() => {
+        gameContainer.style.animation = '';
+      }, 300);
+    }
+    
+    // Hide after delay with glitch out effect
+    setTimeout(() => {
+      congratsContainer.style.transition = 'all 0.15s ease-in';
+      congratsContainer.style.opacity = '0';
+      congratsContainer.style.transform = 'translate(-50%, -50%) scale(1.5) rotate(10deg)';
+      congratsContainer.style.filter = 'blur(5px)';
+      congratsContainer.classList.remove('show');
+      
+      // Reset filter for next time
+      setTimeout(() => {
+        congratsContainer.style.filter = '';
+      }, 200);
+    }, 1200);
   }
   
   private updateRPM(): void {
