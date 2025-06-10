@@ -31,9 +31,11 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: |
+          export BASE_URL="/${{ github.event.repository.name }}/"
+          echo "Building with BASE_URL: $BASE_URL"
+          npm run build
         env:
-          # Configure Vite base path for GitHub Pages
           BASE_URL: /${{ github.event.repository.name }}/
 
       - name: Setup Pages
