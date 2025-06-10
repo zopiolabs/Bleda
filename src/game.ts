@@ -1,46 +1,12 @@
 import * as THREE from 'three';
+import { COLORS, GAME_CONFIG } from './constants';
+import { UIManager } from './ui-manager';
 
 interface Arrow {
   mesh: THREE.Group | THREE.Mesh;
   velocity: THREE.Vector3;
   active: boolean;
 }
-
-// Constants
-const COLORS = {
-  SKY: 0x87CEEB,
-  GROUND: 0x3a5f3a,
-  GRASS_DARK: 0x2d4a2d,
-  GRASS_LIGHT: 0x4a6f4a,
-  ROCK: 0x666666,
-  HORSE_BROWN: 0x6B4423,
-  HORSE_DARK: 0x3C2414,
-  HOOF: 0x1C1C1C,
-  LEATHER_ARMOR: 0x8B4513,
-  SKIN: 0xFFDBB4,
-  HELMET: 0x4A4A4A,
-  PANTS: 0x4A3C28,
-  QUIVER: 0x654321,
-  ARROW_SHAFT: 0x8B7355,
-  ARROW_HEAD: 0x2C2C2C,
-  ARROW_FLETCHING: 0xE0E0E0,
-  BALL: 0xFF0000,
-  TAIL: 0x2C1810,
-  BOWSTRING: 0xFFF8DC
-} as const;
-
-const GAME_CONFIG = {
-  CAMERA_FOV: 75,
-  CAMERA_NEAR: 0.1,
-  CAMERA_FAR: 1000,
-  SHADOW_MAP_SIZE: 2048,
-  WHEEL_RADIUS: 8,
-  ARROW_SPEED: 35,
-  GRAVITY: 15,
-  BLEDA_SPEED: 10,
-  BLEDA_BOUNDS: 15,
-  MIN_SHOTS_FOR_ROAST: 3
-} as const;
 
 export class Game {
   private scene: THREE.Scene;
@@ -68,167 +34,8 @@ export class Game {
   // Material cache
   private materials: Map<string, THREE.Material> = new Map();
   
-  // Shot tracking
-  private shotsFired = 0;
-  private shotsHit = 0;
-  
-  // L33t roast messages based on accuracy
-  private roastMessages = [
-    '|| N00B D3T3CT3D ||',
-    '>> ST0RMT00P3R A1M <<',
-    '[[ BL1ND M0NK3Y ]]',
-    '** P0T4T0 A1M **',
-    '~~ TR4SH T13R ~~',
-    '## W0RST A1M NA ##',
-    '++ UN1NST4LL PLS ++',
-    ':: 404 SK1LL N0T F0UND ::',
-    '<< MY GR4NDM4 B3TT3R >>',
-    '|| 4RML3SS W0ND3R ||',
-    '-- 1NC0MP3T3NT --',
-    '** SPR4Y & PR4Y **',
-    '~~ BR0K3N M0US3? ~~',
-    '>> D3L3T3 G4M3 <<',
-    '[[ C4NT H1T W4T3R ]]',
-    ':: FR0M 0C34N ::',
-    '++ B0T C0NF1RM3D ++',
-    '## W4ST3 0F 4RR0WS ##',
-    '<< N3G4T1V3 K/D >>',
-    '|| CL0WN M0D3 ||',
-    '== P41NF7L T0 W4TCH ==',
-    '>> R3T1R3 PLS <<',
-    '[[ 3MB4RR4SS1NG ]]',
-    '~~ G1T R3KT K1D ~~',
-    '** TRY F1NG3R P41NT **',
-    '++ U N33D GL4SS3S? ++',
-    ':: A1M H4CKS BR0K3N ::',
-    '|| Y0U S33 TH4T? ||',
-    '<< N0 H0P3 4 U >>',
-    '## M1SS3D 4G41N ##',
-    '-- P4TH3T1C --',
-    '** U PL4Y BL1NDF0LD3D? **',
-    '~~ 0% 4CCUR4CY ~~',
-    '[[ TRY B1GG3R T4RG3T ]]',
-    '>> USE B0TH 3Y3S <<',
-    '++ D1D U 3V3N TRY? ++',
-    ':: M4YB3 G0 H0M3 ::',
-    '|| T1M3 2 QU1T ||',
-    '<< L3FT H4ND3D? >>',
-    '## PL4Y1NG W/ F33T? ##',
-    '== 1M4G1N3 B31NG TH1S B4D ==',
-    '** 1TST T1M3 US1NG M0US3? **',
-    '~~ D0NT QU1T D4Y J0B ~~',
-    '[[ M0NK3Y S33 M0NK3Y M1SS ]]',
-    '>> L1K3 4 BL1ND SN1P3R <<',
-    '++ W0RST PL4Y3R 3U ++',
-    ':: M4YB3 TRY C4NDY CRUSH ::',
-    '|| 4UT0-41M BR0K3N ||',
-    '<< D3L3T3 SYST3M32 >>',
-    '## 7N1NST4LL L1F3 ##'
-  ];
-  
-  // L33t messages
-  private l33tMessages = [
-    '|| H34DSH0T ||',
-    '>> N0SC0P3D <<',
-    '[[ ULT1M4T3 ]]',
-    '** FL4WL3SS **',
-    '~~ P3RF3CT10N ~~',
-    '## M4ST3RFU1 ##',
-    '++ G0DL1K3 ++',
-    ':: 3P1C W1N ::',
-    '<< L3G3ND4RY >>',
-    '|| D0M1N4T3D ||',
-    '-- UNST0PP4BL3 --',
-    '** 3L1T3 SN1P3R **',
-    '~~ M4X SK1LLZ ~~',
-    '>> PWN3D 1T <<',
-    '[[ H4X0R3D ]]',
-    ':: N1NJ4 M0D3 ::',
-    '++ SUP3R C0MB0 ++',
-    '## 0V3RK1LL ##',
-    '<< M3G4 STR1K3 >>',
-    '|| PR0 G4M3R ||',
-    '== B00M SH0T ==',
-    '>> 360 N0 SC0P3 <<',
-    '[[ CR1T1C4L H1T ]]',
-    '~~ W1CK3D S1CK ~~',
-    '** B34ST M0D3 **',
-    '++ M0NST3R K1LL ++',
-    ':: FR4G M4ST3R ::',
-    '|| 1337 SK1LLZ ||',
-    '<< T0T4L PWN4G3 >>',
-    '## H34VY H1TT3R ##',
-    '-- K1LLT4CUL4R --',
-    '** R4MP4G3 **',
-    '~~ S4V4G3 ~~',
-    '[[ D34DLY 4CC ||',
-    '>> F4T4L1TY <<',
-    '++ H0LY SM0K3S ++',
-    ':: R3KT ::',
-    '|| N0 M3RCY ||',
-    '<< 1NST4 K1LL >>',
-    '## C4RN4G3 ##',
-    '== D3V4ST4T3D ==',
-    '** K1LL C0NF1RM3D **',
-    '~~ 3XPL0S1V3 ~~',
-    '[[ M4X1MUM P41N ]]',
-    '>> T3RM1N4T3D <<',
-    '++ D3M0L1SH3D ++',
-    ':: 4NN1H1L4T3D ::',
-    '|| SN1P3 G0D ||',
-    '<< CH40S M0D3 >>',
-    '## V1CT0RY ##',
-    '-- 3L1M1N4T3D --',
-    '** W4ST3D **',
-    '~~ F1N1SH H1M ~~',
-    '[[ G4M3 0V3R ]]',
-    '>> Y0U W1N <<',
-    '++ 3P1C F41L ++',
-    ':: N00B SL4Y3R ::',
-    '|| H4CK TH3 PL4N3T ||',
-    '<< CYB3R W4RR10R >>',
-    '## QU4D K1LL ##',
-    '== P3NT4 K1LL ==',
-    '** H3X4 K1LL **',
-    '~~ M3G4 C0MB0 ~~',
-    '[[ UNST0PP4BL3 ]]',
-    '>> R4G3 QU1T <<',
-    '++ TRY H4RD3R ++',
-    ':: G1T GUD ::',
-    '|| 2 3Z 4 U ||',
-    '<< N1C3 TRY K1D >>',
-    '## R3SP4WN L0L ##',
-    '-- G1T R3KT --',
-    '** U M4D BR0? **',
-    '~~ C4NT T0UCH TH1S ~~',
-    '[[ 1M 1N UR B4S3 ]]',
-    '>> K1LL1N UR D00DZ <<',
-    '++ 4LL UR B4S3 ++',
-    ':: B3L0NG 2 US ::',
-    '|| Z3R0 C00L ||',
-    '<< 4C1D BURN >>',
-    '## CR4SH 0V3RR1D3 ##',
-    '== H4CK TH3 G1BS0N ==',
-    '** M4TR1X M0D3 **',
-    '~~ D1G1T4L W4RR10R ~~',
-    '[[ CYB3R 3L1T3 ]]',
-    '>> V1RTU4L K1LL3R <<',
-    '++ P1X3L P3RF3CT ++',
-    ':: R3TR0 R4MP4G3 ::',
-    '|| 8-B1T B34ST ||',
-    '<< GL1TCH M0B >>',
-    '## L4G K1LL ##',
-    '-- P1NG 0F D34TH --',
-    '** N3TW0RK N1NJ4 **',
-    '~~ FR4M3 P3RF3CT ~~',
-    '[[ T1M3 GLITCH ]]',
-    '>> BUG 3XPL01T <<',
-    '++ C0D3 1NJ3CT3D ++',
-    ':: SYST3M H4CK3D ::',
-    '|| K3RN3L P4N1C ||',
-    '<< S3GF4ULT >>',
-    '## BUFF3R 0V3RFL0W ##'
-  ];
+  // UI Manager
+  private uiManager: UIManager;
   
   // Controls
   private keys = {
@@ -266,7 +73,9 @@ export class Game {
     this.createBleda();
     this.createWheel();
     this.setupControls();
-    this.createUI();
+    
+    // Initialize UI Manager
+    this.uiManager = new UIManager();
   }
   
   // Helper method to get or create material
@@ -279,6 +88,26 @@ export class Game {
       this.materials.set(key, material);
     }
     return this.materials.get(key)!;
+  }
+  
+  // Helper to create multiple similar objects
+  private createMultiple<T>(
+    count: number,
+    creator: (index: number) => T
+  ): T[] {
+    return Array.from({ length: count }, (_, i) => creator(i));
+  }
+  
+  // Helper to create positioned mesh with common defaults
+  private createPositionedMesh(
+    geometry: THREE.BufferGeometry,
+    color: number,
+    position: { x: number; y: number; z: number }
+  ): THREE.Mesh {
+    return this.createMesh(geometry, color, {
+      position,
+      castShadow: true
+    });
   }
   
   // Helper method to create mesh with common properties
@@ -341,208 +170,19 @@ export class Game {
     return mesh;
   }
   
-  // Helper method to apply common DOM styles
-  private applyDOMStyles(
-    element: HTMLElement,
-    styles: Partial<CSSStyleDeclaration>
-  ): void {
-    Object.assign(element.style, styles);
+  
+  // Helper to create geometry with common patterns
+  private createGeometry(type: 'box' | 'sphere' | 'cylinder' | 'cone' | 'capsule', ...args: number[]): THREE.BufferGeometry {
+    switch (type) {
+      case 'box': return new THREE.BoxGeometry(...args);
+      case 'sphere': return new THREE.SphereGeometry(...args);
+      case 'cylinder': return new THREE.CylinderGeometry(...args);
+      case 'cone': return new THREE.ConeGeometry(...args);
+      case 'capsule': return new THREE.CapsuleGeometry(...args);
+      default: throw new Error(`Unknown geometry type: ${type}`);
+    }
   }
   
-  // Helper method to create styled DOM element
-  private createStyledElement(
-    tag: string,
-    styles: Partial<CSSStyleDeclaration>,
-    innerHTML?: string
-  ): HTMLElement {
-    const element = document.createElement(tag);
-    this.applyDOMStyles(element, styles);
-    if (innerHTML) element.innerHTML = innerHTML;
-    return element;
-  }
-  
-  // Inject all CSS animations at once
-  private injectCSS(): void {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Common animations */
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-      }
-      
-      @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-2px); }
-        75% { transform: translateX(2px); }
-      }
-      
-      @keyframes glitch {
-        0%, 100% { 
-          text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-        }
-        20% { 
-          text-shadow: -2px 0 #ff0000, 2px 0 #00ff00, 0 0 10px currentColor;
-        }
-        40% { 
-          text-shadow: 2px 0 #ff0000, -2px 0 #00ff00, 0 0 10px currentColor;
-        }
-      }
-      
-      /* Roast message animations */
-      @keyframes roastGlitch {
-        0%, 100% { 
-          transform: translateX(0);
-          filter: hue-rotate(0deg);
-        }
-        10% { transform: translateX(-1px); filter: hue-rotate(10deg); }
-        20% { transform: translateX(1px); filter: hue-rotate(-10deg); }
-        30% { transform: translateX(-1px); filter: hue-rotate(5deg); }
-        40% { transform: translateX(1px); filter: hue-rotate(-5deg); }
-        50% { transform: translateX(0); filter: hue-rotate(0deg); }
-      }
-      
-      #roast-message {
-        animation: roastGlitch 0.5s ease-in-out infinite;
-      }
-      
-      #roast-message.new-roast {
-        animation: roastGlitch 0.2s ease-in-out 5;
-      }
-      
-      /* RPM display animations */
-      #rpm-display {
-        animation: pulse 0.5s ease-in-out infinite;
-      }
-      
-      #rpm-display.danger {
-        animation: pulse 0.2s ease-in-out infinite, shake 0.1s ease-in-out infinite, glitch 0.3s ease-in-out infinite;
-      }
-      
-      /* Retro glitch animations */
-      @keyframes retroGlitch {
-        0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: hue-rotate(0deg); }
-        10% { transform: translate(-48%, -50%) scale(1) rotate(-1deg); filter: hue-rotate(90deg) saturate(2); }
-        20% { transform: translate(-52%, -50%) scale(1.02) rotate(1deg); filter: hue-rotate(180deg) saturate(3); }
-        30% { transform: translate(-50%, -48%) scale(1) rotate(0deg); filter: hue-rotate(270deg) saturate(2); }
-        40% { transform: translate(-50%, -52%) scale(0.98) rotate(0deg); filter: hue-rotate(0deg); }
-        50% { transform: translate(-49%, -50%) scale(1) rotate(0deg); filter: hue-rotate(45deg); }
-        60% { transform: translate(-51%, -50%) scale(1.01) rotate(0deg); filter: hue-rotate(0deg); }
-        100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: hue-rotate(0deg); }
-      }
-      
-      @keyframes scanlines {
-        0% { background-position: 0 0; }
-        100% { background-position: 0 10px; }
-      }
-      
-      @keyframes textGlitch {
-        0%, 100% {
-          text-shadow: 
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        20% {
-          text-shadow: 
-            -2px 0 #ff0000,
-            2px 0 #00ffff,
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        40% {
-          text-shadow: 
-            2px 0 #ff00ff,
-            -2px 0 #ffff00,
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        60% {
-          text-shadow: 
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8),
-            0 0 30px #00ff00;
-        }
-      }
-      
-      @keyframes screenShake {
-        0%, 100% { transform: translate(0, 0); }
-        10% { transform: translate(-2px, -2px); }
-        20% { transform: translate(2px, -2px); }
-        30% { transform: translate(-2px, 2px); }
-        40% { transform: translate(2px, 2px); }
-        50% { transform: translate(-1px, -1px); }
-        60% { transform: translate(1px, -1px); }
-        70% { transform: translate(-1px, 1px); }
-        80% { transform: translate(1px, 1px); }
-        90% { transform: translate(0, 0); }
-      }
-      
-      /* Congrats container specific styles */
-      #congrats-container {
-        image-rendering: pixelated;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: crisp-edges;
-      }
-      
-      #congrats-container::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: repeating-linear-gradient(
-          0deg,
-          rgba(0, 0, 0, 0.15),
-          rgba(0, 0, 0, 0.15) 1px,
-          transparent 1px,
-          transparent 2px
-        );
-        pointer-events: none;
-        animation: scanlines 8s linear infinite;
-      }
-      
-      #congrats-container.show {
-        animation: retroGlitch 0.4s ease-in-out infinite;
-      }
-      
-      #congrats-container.show .congrats-text {
-        animation: textGlitch 0.3s ease-in-out infinite;
-        display: inline-block;
-      }
-      
-      #congrats-container::after {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        background: linear-gradient(45deg, #00ff00, #00ff00 25%, transparent 25%, transparent 75%, #00ff00 75%);
-        z-index: -1;
-        opacity: 0.5;
-        filter: blur(1px);
-      }
-    `;
-    document.head.appendChild(style);
-  }
-  
-  // Helper method to get random array element
-  private getRandomElement<T>(array: T[]): T {
-    return array[Math.floor(Math.random() * array.length)];
-  }
   
   private setupLighting(): void {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -575,13 +215,12 @@ export class Game {
     });
     this.scene.add(this.ground);
     
-    // Add some grass patches for visual variety
+    // Add grass patches using array-based creation
     const grassPatchGeometry = new THREE.CircleGeometry(2, 8);
-    
-    for (let i = 0; i < 20; i++) {
+    const grassPatches = this.createMultiple(20, () => {
       const grassColor = Math.random() > 0.5 ? COLORS.GRASS_DARK : COLORS.GRASS_LIGHT;
       const randomScale = Math.random() * 0.5 + 0.5;
-      const grassPatch = this.createMesh(grassPatchGeometry, grassColor, {
+      return this.createMesh(grassPatchGeometry, grassColor, {
         position: {
           x: (Math.random() - 0.5) * 80,
           y: 0.01,
@@ -591,15 +230,14 @@ export class Game {
         scale: { x: randomScale, y: randomScale, z: 1 },
         receiveShadow: true
       });
-      this.scene.add(grassPatch);
-    }
+    });
+    grassPatches.forEach(patch => this.scene.add(patch));
     
-    // Add some decorative rocks
+    // Add decorative rocks using array-based creation
     const rockGeometry = new THREE.DodecahedronGeometry(0.3, 0);
-    
-    for (let i = 0; i < 10; i++) {
+    const rocks = this.createMultiple(10, () => {
       const randomScale = Math.random() * 0.5 + 0.5;
-      const rock = this.createMesh(rockGeometry, COLORS.ROCK, {
+      return this.createMesh(rockGeometry, COLORS.ROCK, {
         position: {
           x: (Math.random() - 0.5) * 60,
           y: 0.15,
@@ -614,174 +252,172 @@ export class Game {
         castShadow: true,
         receiveShadow: true
       });
-      this.scene.add(rock);
-    }
+    });
+    rocks.forEach(rock => this.scene.add(rock));
   }
   
   private createBleda(): void {
     this.bleda = new THREE.Group();
     
-    // Horse body - more detailed with curved geometry
-    const horseBodyGeometry = new THREE.BoxGeometry(3.5, 2.2, 1.8);
-    const horseBody = this.createMesh(horseBodyGeometry, COLORS.HORSE_BROWN, {
-      castShadow: true
-    });
+    // Horse body parts
+    const horseBody = this.createPositionedMesh(
+      this.createGeometry('box', 3.5, 2.2, 1.8),
+      COLORS.HORSE_BROWN,
+      { x: 0, y: 0, z: 0 }
+    );
     
-    // Horse chest - rounded front
-    const horseChestGeometry = new THREE.SphereGeometry(1.2, 8, 6);
-    const horseChest = this.createMesh(horseChestGeometry, COLORS.HORSE_BROWN, {
-      position: { x: 1.5 },
-      scale: { x: 0.8, y: 1, z: 1 },
-      castShadow: true
-    });
+    const horseChest = this.createMesh(
+      this.createGeometry('sphere', 1.2, 8, 6),
+      COLORS.HORSE_BROWN,
+      {
+        position: { x: 1.5 },
+        scale: { x: 0.8, y: 1, z: 1 },
+        castShadow: true
+      }
+    );
     
-    // Horse neck
-    const horseNeckGeometry = new THREE.CylinderGeometry(0.6, 0.9, 1.5, 8);
-    const horseNeck = this.createMesh(horseNeckGeometry, COLORS.HORSE_BROWN, {
-      position: { x: 2, y: 0.8 },
-      rotation: { z: -Math.PI / 4 },
-      castShadow: true
-    });
+    const horseNeck = this.createMesh(
+      this.createGeometry('cylinder', 0.6, 0.9, 1.5, 8),
+      COLORS.HORSE_BROWN,
+      {
+        position: { x: 2, y: 0.8 },
+        rotation: { z: -Math.PI / 4 },
+        castShadow: true
+      }
+    );
     
-    // Horse head - more detailed
-    const horseHeadGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.8);
-    const horseHead = this.createMesh(horseHeadGeometry, COLORS.HORSE_BROWN, {
-      position: { x: 2.5, y: 1.5 },
-      castShadow: true
-    });
+    const horseHead = this.createPositionedMesh(
+      this.createGeometry('box', 1.2, 0.8, 0.8),
+      COLORS.HORSE_BROWN,
+      { x: 2.5, y: 1.5, z: 0 }
+    );
     
-    // Horse muzzle
-    const horseMuzzleGeometry = new THREE.BoxGeometry(0.6, 0.5, 0.6);
-    const horseMuzzle = this.createMesh(horseMuzzleGeometry, COLORS.HORSE_DARK, {
-      position: { x: 3, y: 1.3 }
-    });
+    const horseMuzzle = this.createMesh(
+      this.createGeometry('box', 0.6, 0.5, 0.6),
+      COLORS.HORSE_DARK,
+      { position: { x: 3, y: 1.3 } }
+    );
     
-    // Horse ears
-    const horseEarGeometry = new THREE.ConeGeometry(0.15, 0.3, 4);
-    const horseEarLeft = this.createMesh(horseEarGeometry, COLORS.HORSE_BROWN, {
-      position: { x: 2.3, y: 2, z: 0.2 }
-    });
-    const horseEarRight = this.createMesh(horseEarGeometry, COLORS.HORSE_BROWN, {
-      position: { x: 2.3, y: 2, z: -0.2 }
-    });
+    // Horse ears - create two ears
+    const horseEarGeometry = this.createGeometry('cone', 0.15, 0.3, 4);
+    const [horseEarLeft, horseEarRight] = [
+      { x: 2.3, y: 2, z: 0.2 },
+      { x: 2.3, y: 2, z: -0.2 }
+    ].map(pos => this.createMesh(horseEarGeometry, COLORS.HORSE_BROWN, { position: pos }));
     
-    // Horse legs - more realistic
-    const legGeometry = new THREE.CylinderGeometry(0.2, 0.25, 2, 6);
-    
-    // Create legs with positions
-    const legPositions = [
-      { x: 1, y: -1.1, z: 0.5 },   // front left
-      { x: 1, y: -1.1, z: -0.5 },  // front right
-      { x: -1, y: -1.1, z: 0.5 },  // back left
-      { x: -1, y: -1.1, z: -0.5 }  // back right
+    // Horse legs and hooves configuration
+    const legConfig = [
+      { name: 'frontLegLeft', x: 1, z: 0.5 },
+      { name: 'frontLegRight', x: 1, z: -0.5 },
+      { name: 'backLegLeft', x: -1, z: 0.5 },
+      { name: 'backLegRight', x: -1, z: -0.5 }
     ];
     
-    const legs = legPositions.map(pos => 
-      this.createMesh(legGeometry, COLORS.HORSE_BROWN, {
-        position: pos,
-        castShadow: true
-      })
-    );
+    // Create legs with hooves
+    const horseLegGeometry = this.createGeometry('cylinder', 0.2, 0.25, 2, 6);
+    const hoofGeometry = this.createGeometry('cylinder', 0.25, 0.2, 0.2, 6);
     
-    const [frontLegLeft, frontLegRight, backLegLeft, backLegRight] = legs;
-    
-    // Horse hooves
-    const hoofGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.2, 6);
-    
-    const hooves = Array(4).fill(null).map(() => 
-      this.createMesh(hoofGeometry, COLORS.HOOF, {
-        position: { y: -2.1 }
-      })
-    );
+    const legsWithHooves = legConfig.map(config => {
+      const leg = this.createPositionedMesh(horseLegGeometry, COLORS.HORSE_BROWN, 
+        { x: config.x, y: -1.1, z: config.z }
+      );
+      const hoof = this.createMesh(hoofGeometry, COLORS.HOOF, { position: { y: -2.1 } });
+      leg.add(hoof);
+      return { name: config.name, mesh: leg };
+    });
     
     // Horse tail
-    const tailGeometry = new THREE.ConeGeometry(0.4, 1.5, 6);
-    const tail = this.createMesh(tailGeometry, COLORS.TAIL, {
-      position: { x: -2, y: -0.5 },
-      rotation: { z: Math.PI / 3 },
-      castShadow: true
-    });
+    const tail = this.createMesh(
+      this.createGeometry('cone', 0.4, 1.5, 6),
+      COLORS.TAIL,
+      {
+        position: { x: -2, y: -0.5 },
+        rotation: { z: Math.PI / 3 },
+        castShadow: true
+      }
+    );
     
     // Rider - more detailed Hun warrior
     const riderGroup = new THREE.Group();
     
-    // Rider torso
-    const torsoGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.6);
-    const torso = this.createMesh(torsoGeometry, COLORS.LEATHER_ARMOR, {
-      position: { x: -0.3, y: 2.5 },
-      castShadow: true
-    });
+    // Rider body parts
+    const torso = this.createPositionedMesh(
+      this.createGeometry('box', 0.8, 1.2, 0.6),
+      COLORS.LEATHER_ARMOR,
+      { x: -0.3, y: 2.5, z: 0 }
+    );
     
-    // Rider head
-    const headGeometry = new THREE.SphereGeometry(0.3, 8, 6);
-    const head = this.createMesh(headGeometry, COLORS.SKIN, {
-      position: { x: -0.3, y: 3.3 },
-      castShadow: true
-    });
+    const head = this.createPositionedMesh(
+      this.createGeometry('sphere', 0.3, 8, 6),
+      COLORS.SKIN,
+      { x: -0.3, y: 3.3, z: 0 }
+    );
     
-    // Rider helmet/hat
-    const helmetGeometry = new THREE.ConeGeometry(0.35, 0.5, 8);
-    const helmet = this.createMesh(helmetGeometry, COLORS.HELMET, {
-      position: { x: -0.3, y: 3.6 }
-    });
+    const helmet = this.createMesh(
+      this.createGeometry('cone', 0.35, 0.5, 8),
+      COLORS.HELMET,
+      { position: { x: -0.3, y: 3.6 } }
+    );
     
-    // Rider arms
-    const armGeometry = new THREE.CapsuleGeometry(0.15, 0.8, 4, 6);
+    // Rider arms and legs
+    const armGeometry = this.createGeometry('capsule', 0.15, 0.8, 4, 6);
+    const [leftArm, rightArm] = [
+      { pos: { x: -0.1, y: 2.8, z: 0.4 }, rot: { z: -Math.PI / 3 } },
+      { pos: { x: -0.5, y: 2.8, z: -0.4 }, rot: { z: -Math.PI / 2.5 } }
+    ].map(config => 
+      this.createMesh(armGeometry, COLORS.LEATHER_ARMOR, {
+        position: config.pos,
+        rotation: config.rot
+      })
+    );
     
-    const leftArm = this.createMesh(armGeometry, COLORS.LEATHER_ARMOR, {
-      position: { x: -0.1, y: 2.8, z: 0.4 },
-      rotation: { z: -Math.PI / 3 }
-    });
-    
-    const rightArm = this.createMesh(armGeometry, COLORS.LEATHER_ARMOR, {
-      position: { x: -0.5, y: 2.8, z: -0.4 },
-      rotation: { z: -Math.PI / 2.5 }
-    });
-    
-    // Rider legs
-    const legRiderGeometry = new THREE.CapsuleGeometry(0.2, 0.8, 4, 6);
-    
-    const leftLeg = this.createMesh(legRiderGeometry, COLORS.PANTS, {
-      position: { x: 0, y: 1.8, z: 0.5 },
-      rotation: { x: -Math.PI / 6 }
-    });
-    
-    const rightLeg = this.createMesh(legRiderGeometry, COLORS.PANTS, {
-      position: { x: 0, y: 1.8, z: -0.5 },
-      rotation: { x: Math.PI / 6 }
-    });
+    const riderLegGeometry = this.createGeometry('capsule', 0.2, 0.8, 4, 6);
+    const [leftLeg, rightLeg] = [
+      { pos: { x: 0, y: 1.8, z: 0.5 }, rot: { x: -Math.PI / 6 } },
+      { pos: { x: 0, y: 1.8, z: -0.5 }, rot: { x: Math.PI / 6 } }
+    ].map(config => 
+      this.createMesh(riderLegGeometry, COLORS.PANTS, {
+        position: config.pos,
+        rotation: config.rot
+      })
+    );
     
     // Quiver
-    const quiverGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 6);
-    const quiver = this.createMesh(quiverGeometry, COLORS.QUIVER, {
-      position: { x: -0.8, y: 2.5, z: 0.3 },
-      rotation: { z: -Math.PI / 12 }
-    });
+    const quiver = this.createMesh(
+      this.createGeometry('cylinder', 0.15, 0.15, 0.8, 6),
+      COLORS.QUIVER,
+      {
+        position: { x: -0.8, y: 2.5, z: 0.3 },
+        rotation: { z: -Math.PI / 12 }
+      }
+    );
     
-    // Arrows in quiver
-    const arrowInQuiverGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.9, 4);
-    for (let i = 0; i < 5; i++) {
+    // Arrows in quiver - create five arranged in circle
+    const arrowInQuiverGeometry = this.createGeometry('cylinder', 0.02, 0.02, 0.9, 4);
+    const arrowsInQuiver = this.createMultiple(5, (i) => {
       const angle = (i / 5) * Math.PI * 2;
-      const arrowInQuiver = this.createMesh(arrowInQuiverGeometry, COLORS.ARROW_SHAFT, {
+      return this.createMesh(arrowInQuiverGeometry, COLORS.ARROW_SHAFT, {
         position: {
           x: -0.8 + Math.cos(angle) * 0.08,
           y: 2.8,
           z: 0.3 + Math.sin(angle) * 0.08
         }
       });
-      riderGroup.add(arrowInQuiver);
-    }
+    });
+    arrowsInQuiver.forEach(arrow => riderGroup.add(arrow));
     
     // Bow - more detailed composite bow
     const bowGroup = new THREE.Group();
-    const bowCurveGeometry = new THREE.TorusGeometry(1.5, 0.08, 6, 12, Math.PI);
-    const bowCurve = this.createMesh(bowCurveGeometry, COLORS.QUIVER);
+    const bowCurve = this.createMesh(
+      new THREE.TorusGeometry(1.5, 0.08, 6, 12, Math.PI),
+      COLORS.QUIVER
+    );
     
-    // Bow string
-    const bowStringGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 4);
-    const bowString = this.createMesh(bowStringGeometry, COLORS.BOWSTRING, {
-      rotation: { z: Math.PI / 2 }
-    });
+    const bowString = this.createMesh(
+      this.createGeometry('cylinder', 0.02, 0.02, 3, 4),
+      COLORS.BOWSTRING,
+      { rotation: { z: Math.PI / 2 } }
+    );
     
     bowGroup.add(bowCurve);
     bowGroup.add(bowString);
@@ -808,16 +444,9 @@ export class Game {
     this.bleda.add(horseMuzzle);
     this.bleda.add(horseEarLeft);
     this.bleda.add(horseEarRight);
-    this.bleda.add(frontLegLeft);
-    this.bleda.add(frontLegRight);
-    this.bleda.add(backLegLeft);
-    this.bleda.add(backLegRight);
     
-    // Add hooves to legs
-    frontLegLeft.add(hooves[0]);
-    frontLegRight.add(hooves[1]);
-    backLegLeft.add(hooves[2]);
-    backLegRight.add(hooves[3]);
+    // Add legs (hooves already attached)
+    legsWithHooves.forEach(leg => this.bleda.add(leg.mesh));
     
     this.bleda.add(tail);
     
@@ -839,15 +468,15 @@ export class Game {
       castShadow: true
     });
     
-    // Wheel spokes
-    const spokeGeometry = new THREE.BoxGeometry(0.3, GAME_CONFIG.WHEEL_RADIUS * 2, 0.3);
-    for (let i = 0; i < 8; i++) {
-      const spoke = this.createMesh(spokeGeometry, COLORS.ARROW_SHAFT, {
+    // Wheel spokes - create 8 spokes arranged radially
+    const spokeGeometry = this.createGeometry('box', 0.3, GAME_CONFIG.WHEEL_RADIUS * 2, 0.3);
+    const spokes = this.createMultiple(8, (i) => 
+      this.createMesh(spokeGeometry, COLORS.ARROW_SHAFT, {
         rotation: { z: (i * Math.PI) / 4 },
         castShadow: true
-      });
-      this.wheel.add(spoke);
-    }
+      })
+    );
+    spokes.forEach(spoke => this.wheel.add(spoke));
     
     // Ball - smaller
     const ballGeometry = new THREE.SphereGeometry(0.4, 16, 16);
@@ -867,28 +496,31 @@ export class Game {
   private createArrow(): Arrow {
     const arrowGroup = new THREE.Group();
     
-    // Arrow shaft - longer and thinner
-    const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 6);
-    const shaft = this.createMesh(shaftGeometry, COLORS.ARROW_SHAFT, {
-      rotation: { z: Math.PI / 2 },
-      castShadow: true
-    });
+    // Arrow components
+    const shaft = this.createMesh(
+      this.createGeometry('cylinder', 0.02, 0.02, 0.8, 6),
+      COLORS.ARROW_SHAFT,
+      {
+        rotation: { z: Math.PI / 2 },
+        castShadow: true
+      }
+    );
     
-    // Arrow head - sharper point
-    const headGeometry = new THREE.ConeGeometry(0.04, 0.15, 4);
-    const head = this.createMesh(headGeometry, COLORS.ARROW_HEAD, {
-      position: { x: 0.475 },
-      rotation: { z: -Math.PI / 2 },
-      castShadow: true
-    });
+    const head = this.createMesh(
+      this.createGeometry('cone', 0.04, 0.15, 4),
+      COLORS.ARROW_HEAD,
+      {
+        position: { x: 0.475 },
+        rotation: { z: -Math.PI / 2 },
+        castShadow: true
+      }
+    );
     
-    // Arrow fletching (feathers) - smaller and at the back
-    const fletchingGeometry = new THREE.BoxGeometry(0.1, 0.08, 0.01);
-    
-    // Three fletching feathers arranged properly
-    for (let i = 0; i < 3; i++) {
+    // Arrow fletching (feathers) - create three arranged in circle
+    const fletchingGeometry = this.createGeometry('box', 0.1, 0.08, 0.01);
+    const fletchings = this.createMultiple(3, (i) => {
       const angle = (i * Math.PI * 2) / 3;
-      const fletching = this.createMesh(fletchingGeometry, COLORS.ARROW_FLETCHING, {
+      return this.createMesh(fletchingGeometry, COLORS.ARROW_FLETCHING, {
         position: {
           x: -0.35,
           y: Math.sin(angle) * 0.03,
@@ -896,15 +528,18 @@ export class Game {
         },
         rotation: { y: angle, x: -0.2 }
       });
-      arrowGroup.add(fletching);
-    }
+    });
+    fletchings.forEach(fletching => arrowGroup.add(fletching));
     
     // Nock (where the arrow meets the bowstring)
-    const nockGeometry = new THREE.CylinderGeometry(0.025, 0.02, 0.05, 6);
-    const nock = this.createMesh(nockGeometry, COLORS.HOOF, {
-      position: { x: -0.425 },
-      rotation: { z: Math.PI / 2 }
-    });
+    const nock = this.createMesh(
+      this.createGeometry('cylinder', 0.025, 0.02, 0.05, 6),
+      COLORS.HOOF,
+      {
+        position: { x: -0.425 },
+        rotation: { z: Math.PI / 2 }
+      }
+    );
     
     arrowGroup.add(shaft);
     arrowGroup.add(head);
@@ -919,8 +554,7 @@ export class Game {
   
   private shoot(): void {
     // Increment shots fired
-    this.shotsFired++;
-    this.updateKDDisplay();
+    this.uiManager.incrementShotsFired();
     
     // Find an inactive arrow or create a new one
     let arrow = this.arrows.find(a => !a.active);
@@ -972,11 +606,9 @@ export class Game {
         arrow.mesh.position.y = -100; // Hide arrow
         
         this.score++;
-        this.shotsHit++;
         this.wheelSpeed *= 1.2; // Increase wheel speed
-        this.updateScore();
-        this.updateKDDisplay();
-        this.showCongratsMessage(); // Show l33t message
+        this.uiManager.updateScore(this.score);
+        this.uiManager.incrementShotsHit(); // This also shows congrats message
         
         // Flash effect
         const ballMaterial = this.ball.material as THREE.MeshLambertMaterial;
@@ -1052,16 +684,16 @@ export class Game {
   }
   
   private createUI(): void {
-    const uiContainer = this.createStyledElement('div', {
-      position: 'absolute',
+    // Score and controls
+    const uiContainer = this.createUIContainer({
       top: '10px',
       left: '10px',
       color: 'white',
       fontFamily: 'Arial',
       fontSize: '20px',
-      textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
-      pointerEvents: 'none'
-    }, `
+      textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
+    });
+    uiContainer.innerHTML = `
       <div id="score">Score: 0</div>
       <div style="margin-top: 20px; font-size: 14px;">
         <div>Controls:</div>
@@ -1069,25 +701,21 @@ export class Game {
         <div>Move mouse: Aim</div>
         <div>Click: Shoot</div>
       </div>
-    `);
-    
+    `;
     document.body.appendChild(uiContainer);
     
     // Create K/D ratio display with roasts
-    const kdContainer = this.createStyledElement('div', {
-      position: 'absolute',
+    const kdContainer = this.createUIContainer({
       top: '10px',
       left: '50%',
       transform: 'translateX(-50%)',
       width: '400px',
-      background: 'linear-gradient(135deg, rgba(20,0,0,0.95) 0%, rgba(40,0,0,0.9) 100%)',
+      background: UI_STYLES.DANGER_BG,
       border: '2px solid #ff0000',
       borderRadius: '0',
       boxShadow: '0 0 30px rgba(255,0,0,0.5), inset 0 0 30px rgba(255,0,0,0.2)',
       padding: '15px',
-      fontFamily: 'Courier New, monospace',
-      textAlign: 'center',
-      pointerEvents: 'none'
+      textAlign: 'center'
     });
     
     kdContainer.innerHTML = `
@@ -1119,19 +747,16 @@ export class Game {
     this.injectCSS();
     
     // Create l33t RPM indicator
-    const rpmContainer = this.createStyledElement('div', {
-      position: 'absolute',
+    const rpmContainer = this.createUIContainer({
       top: '10px',
       right: '10px',
       width: '250px',
       height: '150px',
-      background: 'linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.8) 100%)',
+      background: UI_STYLES.CONTAINER_BG,
       border: '2px solid #00ff00',
       borderRadius: '10px',
       boxShadow: '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.2)',
-      padding: '15px',
-      fontFamily: 'Courier New, monospace',
-      pointerEvents: 'none'
+      padding: '15px'
     });
     
     rpmContainer.innerHTML = `
@@ -1156,44 +781,32 @@ export class Game {
     document.body.appendChild(rpmContainer);
     
     // Add warning text element
-    const warningText = this.createStyledElement('div', {
-      position: 'absolute',
+    const warningText = this.createUIContainer({
       top: '170px',
       right: '10px',
       width: '250px',
       textAlign: 'center',
       color: '#ff0000',
-      fontFamily: 'Courier New, monospace',
       fontSize: '14px',
       textTransform: 'uppercase',
       letterSpacing: '2px',
       display: 'none',
-      pointerEvents: 'none',
       textShadow: '0 0 10px #ff0000'
-    }, '⚠️ DANGER ZONE ⚠️');
-    warningText.id = 'rpm-warning';
+    }, 'rpm-warning');
+    warningText.innerHTML = '⚠️ DANGER ZONE ⚠️';
     document.body.appendChild(warningText);
     
     // Create l33t congratulatory message container
-    const congratsContainer = this.createStyledElement('div', {
-      position: 'absolute',
+    const congratsContainer = this.createUIContainer({
       top: '30%',
       left: '50%',
       transform: 'translate(-50%, -50%) scale(0.5) rotate(-5deg)',
       fontSize: '48px',
-      fontFamily: 'Courier New, monospace',
       fontWeight: 'bold',
       color: '#00ff00',
-      textShadow: `
-        0 0 10px #00ff00,
-        3px 3px 0 #008800,
-        6px 6px 0 #004400,
-        9px 9px 0 #002200,
-        12px 12px 15px rgba(0,0,0,0.8)
-      `,
+      textShadow: UI_STYLES.L33T_TEXT_SHADOW,
       letterSpacing: '8px',
       textAlign: 'center',
-      pointerEvents: 'none',
       opacity: '0',
       transition: 'none',
       zIndex: '1000',
@@ -1201,15 +814,11 @@ export class Game {
       padding: '20px 40px',
       border: '3px solid #00ff00',
       borderRadius: '0',
-      boxShadow: `
-        inset 0 0 50px rgba(0,255,0,0.3),
-        0 0 30px rgba(0,255,0,0.5),
-        0 0 60px rgba(0,255,0,0.3)
-      `,
+      boxShadow: UI_STYLES.GLITCH_BOX_SHADOW('#00ff00'),
       textTransform: 'uppercase',
       whiteSpace: 'nowrap'
-    }, '<span class="congrats-text"></span>');
-    congratsContainer.id = 'congrats-container';
+    }, 'congrats-container');
+    congratsContainer.innerHTML = '<span class="congrats-text"></span>';
     document.body.appendChild(congratsContainer);
   }
   
@@ -1433,25 +1042,24 @@ export class Game {
     if (Math.abs(this.bledaVelocity.x) > 0.1) {
       this.horseLegAnimation += deltaTime * 8;
       
-      // Animate legs
+      // Animate legs - find them by traversing children
       const legSwing = Math.sin(this.horseLegAnimation) * 0.3;
-      const frontLeftLeg = this.bleda.children[7];
-      const frontRightLeg = this.bleda.children[8];
-      const backLeftLeg = this.bleda.children[9];
-      const backRightLeg = this.bleda.children[10];
+      const horseMeshes = this.bleda.children;
       
-      if (frontLeftLeg) frontLeftLeg.rotation.x = legSwing;
-      if (frontRightLeg) frontRightLeg.rotation.x = -legSwing;
-      if (backLeftLeg) backLeftLeg.rotation.x = -legSwing * 0.8;
-      if (backRightLeg) backRightLeg.rotation.x = legSwing * 0.8;
+      // Find legs in the bleda group (they should be children 7-10 based on order added)
+      // But let's be defensive and check if they exist
+      if (horseMeshes[7]) horseMeshes[7].rotation.x = legSwing;
+      if (horseMeshes[8]) horseMeshes[8].rotation.x = -legSwing;
+      if (horseMeshes[9]) horseMeshes[9].rotation.x = -legSwing * 0.8;
+      if (horseMeshes[10]) horseMeshes[10].rotation.x = legSwing * 0.8;
       
       // Subtle body bounce
       this.bleda.position.y = 1 + Math.abs(Math.sin(this.horseLegAnimation * 2)) * 0.1;
       
-      // Tail sway
-      const tail = this.bleda.children[11];
-      if (tail) {
-        tail.rotation.x = Math.sin(this.horseLegAnimation * 0.5) * 0.2;
+      // Tail sway - find tail in children
+      const tailMesh = horseMeshes[11];
+      if (tailMesh) {
+        tailMesh.rotation.x = Math.sin(this.horseLegAnimation * 0.5) * 0.2;
       }
     }
     
@@ -1459,7 +1067,7 @@ export class Game {
     this.wheel.rotation.z += this.wheelSpeed * deltaTime;
     
     // Update RPM display
-    this.updateRPM();
+    this.uiManager.updateRPM(this.wheelSpeed);
     
     // Update arrows
     this.arrows.forEach(arrow => {
