@@ -6,6 +6,42 @@ interface Arrow {
   active: boolean;
 }
 
+// Constants
+const COLORS = {
+  SKY: 0x87CEEB,
+  GROUND: 0x3a5f3a,
+  GRASS_DARK: 0x2d4a2d,
+  GRASS_LIGHT: 0x4a6f4a,
+  ROCK: 0x666666,
+  HORSE_BROWN: 0x6B4423,
+  HORSE_DARK: 0x3C2414,
+  HOOF: 0x1C1C1C,
+  LEATHER_ARMOR: 0x8B4513,
+  SKIN: 0xFFDBB4,
+  HELMET: 0x4A4A4A,
+  PANTS: 0x4A3C28,
+  QUIVER: 0x654321,
+  ARROW_SHAFT: 0x8B7355,
+  ARROW_HEAD: 0x2C2C2C,
+  ARROW_FLETCHING: 0xE0E0E0,
+  BALL: 0xFF0000,
+  TAIL: 0x2C1810,
+  BOWSTRING: 0xFFF8DC
+} as const;
+
+const GAME_CONFIG = {
+  CAMERA_FOV: 75,
+  CAMERA_NEAR: 0.1,
+  CAMERA_FAR: 1000,
+  SHADOW_MAP_SIZE: 2048,
+  WHEEL_RADIUS: 8,
+  ARROW_SPEED: 35,
+  GRAVITY: 15,
+  BLEDA_SPEED: 10,
+  BLEDA_BOUNDS: 15,
+  MIN_SHOTS_FOR_ROAST: 3
+} as const;
+
 export class Game {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
@@ -28,6 +64,9 @@ export class Game {
   private score = 0;
   private bledaPosition = { x: 0, z: 15 };
   private bledaVelocity = { x: 0 };
+  
+  // Material cache
+  private materials: Map<string, THREE.Material> = new Map();
   
   // Shot tracking
   private shotsFired = 0;
@@ -200,15 +239,15 @@ export class Game {
   constructor(container: HTMLElement) {
     // Scene setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87CEEB);
-    this.scene.fog = new THREE.Fog(0x87CEEB, 30, 150);
+    this.scene.background = new THREE.Color(COLORS.SKY);
+    this.scene.fog = new THREE.Fog(COLORS.SKY, 30, 150);
     
     // Camera setup
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      GAME_CONFIG.CAMERA_FOV,
       window.innerWidth / window.innerHeight,
-      0.1,
-      1000
+      GAME_CONFIG.CAMERA_NEAR,
+      GAME_CONFIG.CAMERA_FAR
     );
     this.camera.position.set(0, 10, 25);
     this.camera.lookAt(0, 5, 0);
@@ -230,6 +269,281 @@ export class Game {
     this.createUI();
   }
   
+  // Helper method to get or create material
+  private getMaterial(color: number, type: 'lambert' | 'basic' = 'lambert'): THREE.Material {
+    const key = `${type}_${color}`;
+    if (!this.materials.has(key)) {
+      const material = type === 'lambert' 
+        ? new THREE.MeshLambertMaterial({ color })
+        : new THREE.MeshBasicMaterial({ color });
+      this.materials.set(key, material);
+    }
+    return this.materials.get(key)!;
+  }
+  
+  // Helper method to create mesh with common properties
+  private createMesh(
+    geometry: THREE.BufferGeometry, 
+    color: number, 
+    options: {
+      position?: THREE.Vector3 | { x?: number; y?: number; z?: number };
+      rotation?: THREE.Euler | { x?: number; y?: number; z?: number };
+      scale?: THREE.Vector3 | { x?: number; y?: number; z?: number } | number;
+      castShadow?: boolean;
+      receiveShadow?: boolean;
+      materialType?: 'lambert' | 'basic';
+    } = {}
+  ): THREE.Mesh {
+    const material = this.getMaterial(color, options.materialType || 'lambert');
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    if (options.position) {
+      if (options.position instanceof THREE.Vector3) {
+        mesh.position.copy(options.position);
+      } else {
+        mesh.position.set(
+          options.position.x || 0,
+          options.position.y || 0,
+          options.position.z || 0
+        );
+      }
+    }
+    
+    if (options.rotation) {
+      if (options.rotation instanceof THREE.Euler) {
+        mesh.rotation.copy(options.rotation);
+      } else {
+        mesh.rotation.set(
+          options.rotation.x || 0,
+          options.rotation.y || 0,
+          options.rotation.z || 0
+        );
+      }
+    }
+    
+    if (options.scale) {
+      if (typeof options.scale === 'number') {
+        mesh.scale.setScalar(options.scale);
+      } else if (options.scale instanceof THREE.Vector3) {
+        mesh.scale.copy(options.scale);
+      } else {
+        mesh.scale.set(
+          options.scale.x || 1,
+          options.scale.y || 1,
+          options.scale.z || 1
+        );
+      }
+    }
+    
+    if (options.castShadow !== undefined) mesh.castShadow = options.castShadow;
+    if (options.receiveShadow !== undefined) mesh.receiveShadow = options.receiveShadow;
+    
+    return mesh;
+  }
+  
+  // Helper method to apply common DOM styles
+  private applyDOMStyles(
+    element: HTMLElement,
+    styles: Partial<CSSStyleDeclaration>
+  ): void {
+    Object.assign(element.style, styles);
+  }
+  
+  // Helper method to create styled DOM element
+  private createStyledElement(
+    tag: string,
+    styles: Partial<CSSStyleDeclaration>,
+    innerHTML?: string
+  ): HTMLElement {
+    const element = document.createElement(tag);
+    this.applyDOMStyles(element, styles);
+    if (innerHTML) element.innerHTML = innerHTML;
+    return element;
+  }
+  
+  // Inject all CSS animations at once
+  private injectCSS(): void {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Common animations */
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+      
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px); }
+        75% { transform: translateX(2px); }
+      }
+      
+      @keyframes glitch {
+        0%, 100% { 
+          text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        }
+        20% { 
+          text-shadow: -2px 0 #ff0000, 2px 0 #00ff00, 0 0 10px currentColor;
+        }
+        40% { 
+          text-shadow: 2px 0 #ff0000, -2px 0 #00ff00, 0 0 10px currentColor;
+        }
+      }
+      
+      /* Roast message animations */
+      @keyframes roastGlitch {
+        0%, 100% { 
+          transform: translateX(0);
+          filter: hue-rotate(0deg);
+        }
+        10% { transform: translateX(-1px); filter: hue-rotate(10deg); }
+        20% { transform: translateX(1px); filter: hue-rotate(-10deg); }
+        30% { transform: translateX(-1px); filter: hue-rotate(5deg); }
+        40% { transform: translateX(1px); filter: hue-rotate(-5deg); }
+        50% { transform: translateX(0); filter: hue-rotate(0deg); }
+      }
+      
+      #roast-message {
+        animation: roastGlitch 0.5s ease-in-out infinite;
+      }
+      
+      #roast-message.new-roast {
+        animation: roastGlitch 0.2s ease-in-out 5;
+      }
+      
+      /* RPM display animations */
+      #rpm-display {
+        animation: pulse 0.5s ease-in-out infinite;
+      }
+      
+      #rpm-display.danger {
+        animation: pulse 0.2s ease-in-out infinite, shake 0.1s ease-in-out infinite, glitch 0.3s ease-in-out infinite;
+      }
+      
+      /* Retro glitch animations */
+      @keyframes retroGlitch {
+        0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+        10% { transform: translate(-48%, -50%) scale(1) rotate(-1deg); filter: hue-rotate(90deg) saturate(2); }
+        20% { transform: translate(-52%, -50%) scale(1.02) rotate(1deg); filter: hue-rotate(180deg) saturate(3); }
+        30% { transform: translate(-50%, -48%) scale(1) rotate(0deg); filter: hue-rotate(270deg) saturate(2); }
+        40% { transform: translate(-50%, -52%) scale(0.98) rotate(0deg); filter: hue-rotate(0deg); }
+        50% { transform: translate(-49%, -50%) scale(1) rotate(0deg); filter: hue-rotate(45deg); }
+        60% { transform: translate(-51%, -50%) scale(1.01) rotate(0deg); filter: hue-rotate(0deg); }
+        100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+      }
+      
+      @keyframes scanlines {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 10px; }
+      }
+      
+      @keyframes textGlitch {
+        0%, 100% {
+          text-shadow: 
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        20% {
+          text-shadow: 
+            -2px 0 #ff0000,
+            2px 0 #00ffff,
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        40% {
+          text-shadow: 
+            2px 0 #ff00ff,
+            -2px 0 #ffff00,
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8);
+        }
+        60% {
+          text-shadow: 
+            0 0 10px #00ff00,
+            3px 3px 0 #008800,
+            6px 6px 0 #004400,
+            9px 9px 0 #002200,
+            12px 12px 15px rgba(0,0,0,0.8),
+            0 0 30px #00ff00;
+        }
+      }
+      
+      @keyframes screenShake {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-2px, -2px); }
+        20% { transform: translate(2px, -2px); }
+        30% { transform: translate(-2px, 2px); }
+        40% { transform: translate(2px, 2px); }
+        50% { transform: translate(-1px, -1px); }
+        60% { transform: translate(1px, -1px); }
+        70% { transform: translate(-1px, 1px); }
+        80% { transform: translate(1px, 1px); }
+        90% { transform: translate(0, 0); }
+      }
+      
+      /* Congrats container specific styles */
+      #congrats-container {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+      }
+      
+      #congrats-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.15),
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+        pointer-events: none;
+        animation: scanlines 8s linear infinite;
+      }
+      
+      #congrats-container.show {
+        animation: retroGlitch 0.4s ease-in-out infinite;
+      }
+      
+      #congrats-container.show .congrats-text {
+        animation: textGlitch 0.3s ease-in-out infinite;
+        display: inline-block;
+      }
+      
+      #congrats-container::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #00ff00, #00ff00 25%, transparent 25%, transparent 75%, #00ff00 75%);
+        z-index: -1;
+        opacity: 0.5;
+        filter: blur(1px);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  // Helper method to get random array element
+  private getRandomElement<T>(array: T[]): T {
+    return array[Math.floor(Math.random() * array.length)];
+  }
+  
   private setupLighting(): void {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     this.scene.add(ambientLight);
@@ -243,72 +557,63 @@ export class Game {
     directionalLight.shadow.camera.bottom = -20;
     directionalLight.shadow.camera.near = 0.1;
     directionalLight.shadow.camera.far = 50;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.mapSize.width = GAME_CONFIG.SHADOW_MAP_SIZE;
+    directionalLight.shadow.mapSize.height = GAME_CONFIG.SHADOW_MAP_SIZE;
     this.scene.add(directionalLight);
     
     // Add a subtle rim light
-    const rimLight = new THREE.DirectionalLight(0x87CEEB, 0.3);
+    const rimLight = new THREE.DirectionalLight(COLORS.SKY, 0.3);
     rimLight.position.set(-5, 10, -10);
     this.scene.add(rimLight);
   }
   
   private createGround(): void {
     const groundGeometry = new THREE.PlaneGeometry(100, 100);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x3a5f3a });
-    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    this.ground.rotation.x = -Math.PI / 2;
-    this.ground.receiveShadow = true;
+    this.ground = this.createMesh(groundGeometry, COLORS.GROUND, {
+      rotation: { x: -Math.PI / 2 },
+      receiveShadow: true
+    });
     this.scene.add(this.ground);
     
     // Add some grass patches for visual variety
     const grassPatchGeometry = new THREE.CircleGeometry(2, 8);
-    const grassDarkMaterial = new THREE.MeshLambertMaterial({ color: 0x2d4a2d });
-    const grassLightMaterial = new THREE.MeshLambertMaterial({ color: 0x4a6f4a });
     
     for (let i = 0; i < 20; i++) {
-      const grassPatch = new THREE.Mesh(
-        grassPatchGeometry,
-        Math.random() > 0.5 ? grassDarkMaterial : grassLightMaterial
-      );
-      grassPatch.rotation.x = -Math.PI / 2;
-      grassPatch.position.set(
-        (Math.random() - 0.5) * 80,
-        0.01,
-        (Math.random() - 0.5) * 80
-      );
-      grassPatch.scale.set(
-        Math.random() * 0.5 + 0.5,
-        Math.random() * 0.5 + 0.5,
-        1
-      );
-      grassPatch.receiveShadow = true;
+      const grassColor = Math.random() > 0.5 ? COLORS.GRASS_DARK : COLORS.GRASS_LIGHT;
+      const randomScale = Math.random() * 0.5 + 0.5;
+      const grassPatch = this.createMesh(grassPatchGeometry, grassColor, {
+        position: {
+          x: (Math.random() - 0.5) * 80,
+          y: 0.01,
+          z: (Math.random() - 0.5) * 80
+        },
+        rotation: { x: -Math.PI / 2 },
+        scale: { x: randomScale, y: randomScale, z: 1 },
+        receiveShadow: true
+      });
       this.scene.add(grassPatch);
     }
     
     // Add some decorative rocks
     const rockGeometry = new THREE.DodecahedronGeometry(0.3, 0);
-    const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
     
     for (let i = 0; i < 10; i++) {
-      const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-      rock.position.set(
-        (Math.random() - 0.5) * 60,
-        0.15,
-        (Math.random() - 0.5) * 60
-      );
-      rock.scale.set(
-        Math.random() * 0.5 + 0.5,
-        Math.random() * 0.5 + 0.5,
-        Math.random() * 0.5 + 0.5
-      );
-      rock.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      rock.castShadow = true;
-      rock.receiveShadow = true;
+      const randomScale = Math.random() * 0.5 + 0.5;
+      const rock = this.createMesh(rockGeometry, COLORS.ROCK, {
+        position: {
+          x: (Math.random() - 0.5) * 60,
+          y: 0.15,
+          z: (Math.random() - 0.5) * 60
+        },
+        rotation: {
+          x: Math.random() * Math.PI,
+          y: Math.random() * Math.PI,
+          z: Math.random() * Math.PI
+        },
+        scale: randomScale,
+        castShadow: true,
+        receiveShadow: true
+      });
       this.scene.add(rock);
     }
   }
@@ -316,168 +621,167 @@ export class Game {
   private createBleda(): void {
     this.bleda = new THREE.Group();
     
-    // Horse materials
-    const horseBrownMaterial = new THREE.MeshLambertMaterial({ color: 0x6B4423 });
-    const horseDarkMaterial = new THREE.MeshLambertMaterial({ color: 0x3C2414 });
-    
     // Horse body - more detailed with curved geometry
     const horseBodyGeometry = new THREE.BoxGeometry(3.5, 2.2, 1.8);
-    const horseBody = new THREE.Mesh(horseBodyGeometry, horseBrownMaterial);
-    horseBody.castShadow = true;
-    horseBody.position.set(0, 0, 0);
+    const horseBody = this.createMesh(horseBodyGeometry, COLORS.HORSE_BROWN, {
+      castShadow: true
+    });
     
     // Horse chest - rounded front
     const horseChestGeometry = new THREE.SphereGeometry(1.2, 8, 6);
-    const horseChest = new THREE.Mesh(horseChestGeometry, horseBrownMaterial);
-    horseChest.scale.set(0.8, 1, 1);
-    horseChest.position.set(1.5, 0, 0);
-    horseChest.castShadow = true;
+    const horseChest = this.createMesh(horseChestGeometry, COLORS.HORSE_BROWN, {
+      position: { x: 1.5 },
+      scale: { x: 0.8, y: 1, z: 1 },
+      castShadow: true
+    });
     
     // Horse neck
     const horseNeckGeometry = new THREE.CylinderGeometry(0.6, 0.9, 1.5, 8);
-    const horseNeck = new THREE.Mesh(horseNeckGeometry, horseBrownMaterial);
-    horseNeck.rotation.z = -Math.PI / 4;
-    horseNeck.position.set(2, 0.8, 0);
-    horseNeck.castShadow = true;
+    const horseNeck = this.createMesh(horseNeckGeometry, COLORS.HORSE_BROWN, {
+      position: { x: 2, y: 0.8 },
+      rotation: { z: -Math.PI / 4 },
+      castShadow: true
+    });
     
     // Horse head - more detailed
     const horseHeadGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.8);
-    const horseHead = new THREE.Mesh(horseHeadGeometry, horseBrownMaterial);
-    horseHead.position.set(2.5, 1.5, 0);
-    horseHead.castShadow = true;
+    const horseHead = this.createMesh(horseHeadGeometry, COLORS.HORSE_BROWN, {
+      position: { x: 2.5, y: 1.5 },
+      castShadow: true
+    });
     
     // Horse muzzle
     const horseMuzzleGeometry = new THREE.BoxGeometry(0.6, 0.5, 0.6);
-    const horseMuzzle = new THREE.Mesh(horseMuzzleGeometry, horseDarkMaterial);
-    horseMuzzle.position.set(3, 1.3, 0);
+    const horseMuzzle = this.createMesh(horseMuzzleGeometry, COLORS.HORSE_DARK, {
+      position: { x: 3, y: 1.3 }
+    });
     
     // Horse ears
     const horseEarGeometry = new THREE.ConeGeometry(0.15, 0.3, 4);
-    const horseEarLeft = new THREE.Mesh(horseEarGeometry, horseBrownMaterial);
-    horseEarLeft.position.set(2.3, 2, 0.2);
-    const horseEarRight = new THREE.Mesh(horseEarGeometry, horseBrownMaterial);
-    horseEarRight.position.set(2.3, 2, -0.2);
+    const horseEarLeft = this.createMesh(horseEarGeometry, COLORS.HORSE_BROWN, {
+      position: { x: 2.3, y: 2, z: 0.2 }
+    });
+    const horseEarRight = this.createMesh(horseEarGeometry, COLORS.HORSE_BROWN, {
+      position: { x: 2.3, y: 2, z: -0.2 }
+    });
     
     // Horse legs - more realistic
     const legGeometry = new THREE.CylinderGeometry(0.2, 0.25, 2, 6);
-    const legMaterial = horseBrownMaterial;
     
-    // Front legs
-    const frontLegLeft = new THREE.Mesh(legGeometry, legMaterial);
-    frontLegLeft.position.set(1, -1.1, 0.5);
-    frontLegLeft.castShadow = true;
+    // Create legs with positions
+    const legPositions = [
+      { x: 1, y: -1.1, z: 0.5 },   // front left
+      { x: 1, y: -1.1, z: -0.5 },  // front right
+      { x: -1, y: -1.1, z: 0.5 },  // back left
+      { x: -1, y: -1.1, z: -0.5 }  // back right
+    ];
     
-    const frontLegRight = new THREE.Mesh(legGeometry, legMaterial);
-    frontLegRight.position.set(1, -1.1, -0.5);
-    frontLegRight.castShadow = true;
+    const legs = legPositions.map(pos => 
+      this.createMesh(legGeometry, COLORS.HORSE_BROWN, {
+        position: pos,
+        castShadow: true
+      })
+    );
     
-    // Back legs
-    const backLegLeft = new THREE.Mesh(legGeometry, legMaterial);
-    backLegLeft.position.set(-1, -1.1, 0.5);
-    backLegLeft.castShadow = true;
-    
-    const backLegRight = new THREE.Mesh(legGeometry, legMaterial);
-    backLegRight.position.set(-1, -1.1, -0.5);
-    backLegRight.castShadow = true;
+    const [frontLegLeft, frontLegRight, backLegLeft, backLegRight] = legs;
     
     // Horse hooves
     const hoofGeometry = new THREE.CylinderGeometry(0.25, 0.2, 0.2, 6);
-    const hoofMaterial = new THREE.MeshLambertMaterial({ color: 0x1C1C1C });
     
-    const hooves = [];
-    for (let i = 0; i < 4; i++) {
-      const hoof = new THREE.Mesh(hoofGeometry, hoofMaterial);
-      hoof.position.y = -2.1;
-      hooves.push(hoof);
-    }
+    const hooves = Array(4).fill(null).map(() => 
+      this.createMesh(hoofGeometry, COLORS.HOOF, {
+        position: { y: -2.1 }
+      })
+    );
     
     // Horse tail
     const tailGeometry = new THREE.ConeGeometry(0.4, 1.5, 6);
-    const tailMaterial = new THREE.MeshLambertMaterial({ color: 0x2C1810 });
-    const tail = new THREE.Mesh(tailGeometry, tailMaterial);
-    tail.rotation.z = Math.PI / 3;
-    tail.position.set(-2, -0.5, 0);
-    tail.castShadow = true;
+    const tail = this.createMesh(tailGeometry, COLORS.TAIL, {
+      position: { x: -2, y: -0.5 },
+      rotation: { z: Math.PI / 3 },
+      castShadow: true
+    });
     
     // Rider - more detailed Hun warrior
     const riderGroup = new THREE.Group();
     
     // Rider torso
     const torsoGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.6);
-    const torsoMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Leather armor
-    const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
-    torso.position.set(-0.3, 2.5, 0);
-    torso.castShadow = true;
+    const torso = this.createMesh(torsoGeometry, COLORS.LEATHER_ARMOR, {
+      position: { x: -0.3, y: 2.5 },
+      castShadow: true
+    });
     
     // Rider head
     const headGeometry = new THREE.SphereGeometry(0.3, 8, 6);
-    const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBB4 });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.set(-0.3, 3.3, 0);
-    head.castShadow = true;
+    const head = this.createMesh(headGeometry, COLORS.SKIN, {
+      position: { x: -0.3, y: 3.3 },
+      castShadow: true
+    });
     
     // Rider helmet/hat
     const helmetGeometry = new THREE.ConeGeometry(0.35, 0.5, 8);
-    const helmetMaterial = new THREE.MeshLambertMaterial({ color: 0x4A4A4A });
-    const helmet = new THREE.Mesh(helmetGeometry, helmetMaterial);
-    helmet.position.set(-0.3, 3.6, 0);
+    const helmet = this.createMesh(helmetGeometry, COLORS.HELMET, {
+      position: { x: -0.3, y: 3.6 }
+    });
     
     // Rider arms
     const armGeometry = new THREE.CapsuleGeometry(0.15, 0.8, 4, 6);
-    const armMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
     
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.rotation.z = -Math.PI / 3;
-    leftArm.position.set(-0.1, 2.8, 0.4);
+    const leftArm = this.createMesh(armGeometry, COLORS.LEATHER_ARMOR, {
+      position: { x: -0.1, y: 2.8, z: 0.4 },
+      rotation: { z: -Math.PI / 3 }
+    });
     
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.rotation.z = -Math.PI / 2.5;
-    rightArm.position.set(-0.5, 2.8, -0.4);
+    const rightArm = this.createMesh(armGeometry, COLORS.LEATHER_ARMOR, {
+      position: { x: -0.5, y: 2.8, z: -0.4 },
+      rotation: { z: -Math.PI / 2.5 }
+    });
     
     // Rider legs
     const legRiderGeometry = new THREE.CapsuleGeometry(0.2, 0.8, 4, 6);
-    const legRiderMaterial = new THREE.MeshLambertMaterial({ color: 0x4A3C28 }); // Dark pants
     
-    const leftLeg = new THREE.Mesh(legRiderGeometry, legRiderMaterial);
-    leftLeg.rotation.x = -Math.PI / 6;
-    leftLeg.position.set(0, 1.8, 0.5);
+    const leftLeg = this.createMesh(legRiderGeometry, COLORS.PANTS, {
+      position: { x: 0, y: 1.8, z: 0.5 },
+      rotation: { x: -Math.PI / 6 }
+    });
     
-    const rightLeg = new THREE.Mesh(legRiderGeometry, legRiderMaterial);
-    rightLeg.rotation.x = Math.PI / 6;
-    rightLeg.position.set(0, 1.8, -0.5);
+    const rightLeg = this.createMesh(legRiderGeometry, COLORS.PANTS, {
+      position: { x: 0, y: 1.8, z: -0.5 },
+      rotation: { x: Math.PI / 6 }
+    });
     
     // Quiver
     const quiverGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 6);
-    const quiverMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
-    const quiver = new THREE.Mesh(quiverGeometry, quiverMaterial);
-    quiver.position.set(-0.8, 2.5, 0.3);
-    quiver.rotation.z = -Math.PI / 12;
+    const quiver = this.createMesh(quiverGeometry, COLORS.QUIVER, {
+      position: { x: -0.8, y: 2.5, z: 0.3 },
+      rotation: { z: -Math.PI / 12 }
+    });
     
     // Arrows in quiver
     const arrowInQuiverGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.9, 4);
-    const arrowInQuiverMaterial = new THREE.MeshLambertMaterial({ color: 0x8B7355 });
     for (let i = 0; i < 5; i++) {
-      const arrowInQuiver = new THREE.Mesh(arrowInQuiverGeometry, arrowInQuiverMaterial);
       const angle = (i / 5) * Math.PI * 2;
-      arrowInQuiver.position.set(
-        -0.8 + Math.cos(angle) * 0.08,
-        2.8,
-        0.3 + Math.sin(angle) * 0.08
-      );
+      const arrowInQuiver = this.createMesh(arrowInQuiverGeometry, COLORS.ARROW_SHAFT, {
+        position: {
+          x: -0.8 + Math.cos(angle) * 0.08,
+          y: 2.8,
+          z: 0.3 + Math.sin(angle) * 0.08
+        }
+      });
       riderGroup.add(arrowInQuiver);
     }
     
     // Bow - more detailed composite bow
     const bowGroup = new THREE.Group();
     const bowCurveGeometry = new THREE.TorusGeometry(1.5, 0.08, 6, 12, Math.PI);
-    const bowMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
-    const bowCurve = new THREE.Mesh(bowCurveGeometry, bowMaterial);
+    const bowCurve = this.createMesh(bowCurveGeometry, COLORS.QUIVER);
     
     // Bow string
     const bowStringGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 4);
-    const bowStringMaterial = new THREE.MeshLambertMaterial({ color: 0xFFF8DC });
-    const bowString = new THREE.Mesh(bowStringGeometry, bowStringMaterial);
-    bowString.rotation.z = Math.PI / 2;
+    const bowString = this.createMesh(bowStringGeometry, COLORS.BOWSTRING, {
+      rotation: { z: Math.PI / 2 }
+    });
     
     bowGroup.add(bowCurve);
     bowGroup.add(bowString);
@@ -530,31 +834,31 @@ export class Game {
     this.wheel = new THREE.Group();
     
     // Wheel structure - larger and vertical
-    const wheelRadius = 8;
-    const wheelGeometry = new THREE.TorusGeometry(wheelRadius, 0.4, 8, 30);
-    const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x8B7355 });
-    const wheelMesh = new THREE.Mesh(wheelGeometry, wheelMaterial);
-    wheelMesh.castShadow = true;
+    const wheelGeometry = new THREE.TorusGeometry(GAME_CONFIG.WHEEL_RADIUS, 0.4, 8, 30);
+    const wheelMesh = this.createMesh(wheelGeometry, COLORS.ARROW_SHAFT, {
+      castShadow: true
+    });
     
     // Wheel spokes
+    const spokeGeometry = new THREE.BoxGeometry(0.3, GAME_CONFIG.WHEEL_RADIUS * 2, 0.3);
     for (let i = 0; i < 8; i++) {
-      const spokeGeometry = new THREE.BoxGeometry(0.3, wheelRadius * 2, 0.3);
-      const spoke = new THREE.Mesh(spokeGeometry, wheelMaterial);
-      spoke.rotation.z = (i * Math.PI) / 4;
-      spoke.castShadow = true;
+      const spoke = this.createMesh(spokeGeometry, COLORS.ARROW_SHAFT, {
+        rotation: { z: (i * Math.PI) / 4 },
+        castShadow: true
+      });
       this.wheel.add(spoke);
     }
     
     // Ball - smaller
     const ballGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-    const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xFF0000 });
-    this.ball = new THREE.Mesh(ballGeometry, ballMaterial);
-    this.ball.position.set(wheelRadius - 0.5, 0, 0);
-    this.ball.castShadow = true;
+    this.ball = this.createMesh(ballGeometry, COLORS.BALL, {
+      position: { x: GAME_CONFIG.WHEEL_RADIUS - 0.5 },
+      castShadow: true
+    });
     
     this.wheel.add(wheelMesh);
     this.wheel.add(this.ball);
-    this.wheel.position.set(0, wheelRadius + 2, -15);
+    this.wheel.position.set(0, GAME_CONFIG.WHEEL_RADIUS + 2, -15);
     // No rotation needed - wheel is already vertical
     
     this.scene.add(this.wheel);
@@ -565,41 +869,42 @@ export class Game {
     
     // Arrow shaft - longer and thinner
     const shaftGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 6);
-    const shaftMaterial = new THREE.MeshLambertMaterial({ color: 0x8B7355 });
-    const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
-    shaft.rotation.z = Math.PI / 2;
-    shaft.castShadow = true;
+    const shaft = this.createMesh(shaftGeometry, COLORS.ARROW_SHAFT, {
+      rotation: { z: Math.PI / 2 },
+      castShadow: true
+    });
     
     // Arrow head - sharper point
     const headGeometry = new THREE.ConeGeometry(0.04, 0.15, 4);
-    const headMaterial = new THREE.MeshLambertMaterial({ color: 0x2C2C2C });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.rotation.z = -Math.PI / 2;
-    head.position.x = 0.475;
-    head.castShadow = true;
+    const head = this.createMesh(headGeometry, COLORS.ARROW_HEAD, {
+      position: { x: 0.475 },
+      rotation: { z: -Math.PI / 2 },
+      castShadow: true
+    });
     
     // Arrow fletching (feathers) - smaller and at the back
     const fletchingGeometry = new THREE.BoxGeometry(0.1, 0.08, 0.01);
-    const fletchingMaterial = new THREE.MeshLambertMaterial({ color: 0xE0E0E0 });
     
     // Three fletching feathers arranged properly
     for (let i = 0; i < 3; i++) {
-      const fletching = new THREE.Mesh(fletchingGeometry, fletchingMaterial);
-      fletching.position.x = -0.35;
       const angle = (i * Math.PI * 2) / 3;
-      fletching.position.y = Math.sin(angle) * 0.03;
-      fletching.position.z = Math.cos(angle) * 0.03;
-      fletching.rotation.y = angle;
-      fletching.rotation.x = -0.2; // Slight angle for realism
+      const fletching = this.createMesh(fletchingGeometry, COLORS.ARROW_FLETCHING, {
+        position: {
+          x: -0.35,
+          y: Math.sin(angle) * 0.03,
+          z: Math.cos(angle) * 0.03
+        },
+        rotation: { y: angle, x: -0.2 }
+      });
       arrowGroup.add(fletching);
     }
     
     // Nock (where the arrow meets the bowstring)
     const nockGeometry = new THREE.CylinderGeometry(0.025, 0.02, 0.05, 6);
-    const nockMaterial = new THREE.MeshLambertMaterial({ color: 0x1C1C1C });
-    const nock = new THREE.Mesh(nockGeometry, nockMaterial);
-    nock.rotation.z = Math.PI / 2;
-    nock.position.x = -0.425;
+    const nock = this.createMesh(nockGeometry, COLORS.HOOF, {
+      position: { x: -0.425 },
+      rotation: { z: Math.PI / 2 }
+    });
     
     arrowGroup.add(shaft);
     arrowGroup.add(head);
@@ -643,8 +948,7 @@ export class Game {
     direction.subVectors(targetPoint, bowWorldPos).normalize();
     
     // Set arrow velocity
-    const speed = 35;
-    arrow.velocity.copy(direction).multiplyScalar(speed);
+    arrow.velocity.copy(direction).multiplyScalar(GAME_CONFIG.ARROW_SPEED);
     
     // Orient arrow to face direction
     arrow.mesh.lookAt(targetPoint);
@@ -748,17 +1052,16 @@ export class Game {
   }
   
   private createUI(): void {
-    const uiContainer = document.createElement('div');
-    uiContainer.style.position = 'absolute';
-    uiContainer.style.top = '10px';
-    uiContainer.style.left = '10px';
-    uiContainer.style.color = 'white';
-    uiContainer.style.fontFamily = 'Arial';
-    uiContainer.style.fontSize = '20px';
-    uiContainer.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
-    uiContainer.style.pointerEvents = 'none';
-    
-    uiContainer.innerHTML = `
+    const uiContainer = this.createStyledElement('div', {
+      position: 'absolute',
+      top: '10px',
+      left: '10px',
+      color: 'white',
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+      pointerEvents: 'none'
+    }, `
       <div id="score">Score: 0</div>
       <div style="margin-top: 20px; font-size: 14px;">
         <div>Controls:</div>
@@ -766,25 +1069,26 @@ export class Game {
         <div>Move mouse: Aim</div>
         <div>Click: Shoot</div>
       </div>
-    `;
+    `);
     
     document.body.appendChild(uiContainer);
     
     // Create K/D ratio display with roasts
-    const kdContainer = document.createElement('div');
-    kdContainer.style.position = 'absolute';
-    kdContainer.style.top = '10px';
-    kdContainer.style.left = '50%';
-    kdContainer.style.transform = 'translateX(-50%)';
-    kdContainer.style.width = '400px';
-    kdContainer.style.background = 'linear-gradient(135deg, rgba(20,0,0,0.95) 0%, rgba(40,0,0,0.9) 100%)';
-    kdContainer.style.border = '2px solid #ff0000';
-    kdContainer.style.borderRadius = '0';
-    kdContainer.style.boxShadow = '0 0 30px rgba(255,0,0,0.5), inset 0 0 30px rgba(255,0,0,0.2)';
-    kdContainer.style.padding = '15px';
-    kdContainer.style.fontFamily = 'Courier New, monospace';
-    kdContainer.style.textAlign = 'center';
-    kdContainer.style.pointerEvents = 'none';
+    const kdContainer = this.createStyledElement('div', {
+      position: 'absolute',
+      top: '10px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: '400px',
+      background: 'linear-gradient(135deg, rgba(20,0,0,0.95) 0%, rgba(40,0,0,0.9) 100%)',
+      border: '2px solid #ff0000',
+      borderRadius: '0',
+      boxShadow: '0 0 30px rgba(255,0,0,0.5), inset 0 0 30px rgba(255,0,0,0.2)',
+      padding: '15px',
+      fontFamily: 'Courier New, monospace',
+      textAlign: 'center',
+      pointerEvents: 'none'
+    });
     
     kdContainer.innerHTML = `
       <div style="color: #ff0000; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 10px;">
@@ -811,60 +1115,24 @@ export class Game {
     
     document.body.appendChild(kdContainer);
     
-    // Add glitch effect for roast messages
-    const kdStyle = document.createElement('style');
-    kdStyle.textContent = `
-      @keyframes roastGlitch {
-        0%, 100% { 
-          transform: translateX(0);
-          filter: hue-rotate(0deg);
-        }
-        10% { 
-          transform: translateX(-1px);
-          filter: hue-rotate(10deg);
-        }
-        20% { 
-          transform: translateX(1px);
-          filter: hue-rotate(-10deg);
-        }
-        30% { 
-          transform: translateX(-1px);
-          filter: hue-rotate(5deg);
-        }
-        40% { 
-          transform: translateX(1px);
-          filter: hue-rotate(-5deg);
-        }
-        50% { 
-          transform: translateX(0);
-          filter: hue-rotate(0deg);
-        }
-      }
-      
-      #roast-message {
-        animation: roastGlitch 0.5s ease-in-out infinite;
-      }
-      
-      #roast-message.new-roast {
-        animation: roastGlitch 0.2s ease-in-out 5;
-      }
-    `;
-    document.head.appendChild(kdStyle);
+    // Add all CSS animations
+    this.injectCSS();
     
     // Create l33t RPM indicator
-    const rpmContainer = document.createElement('div');
-    rpmContainer.style.position = 'absolute';
-    rpmContainer.style.top = '10px';
-    rpmContainer.style.right = '10px';
-    rpmContainer.style.width = '250px';
-    rpmContainer.style.height = '150px';
-    rpmContainer.style.background = 'linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.8) 100%)';
-    rpmContainer.style.border = '2px solid #00ff00';
-    rpmContainer.style.borderRadius = '10px';
-    rpmContainer.style.boxShadow = '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.2)';
-    rpmContainer.style.padding = '15px';
-    rpmContainer.style.fontFamily = 'Courier New, monospace';
-    rpmContainer.style.pointerEvents = 'none';
+    const rpmContainer = this.createStyledElement('div', {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      width: '250px',
+      height: '150px',
+      background: 'linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(20,20,20,0.8) 100%)',
+      border: '2px solid #00ff00',
+      borderRadius: '10px',
+      boxShadow: '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.2)',
+      padding: '15px',
+      fontFamily: 'Courier New, monospace',
+      pointerEvents: 'none'
+    });
     
     rpmContainer.innerHTML = `
       <div style="color: #00ff00; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
@@ -887,244 +1155,62 @@ export class Game {
     
     document.body.appendChild(rpmContainer);
     
-    // Add pulsing animation CSS
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.7; }
-        100% { opacity: 1; }
-      }
-      @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-2px); }
-        75% { transform: translateX(2px); }
-      }
-      @keyframes glitch {
-        0%, 100% { 
-          text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-        }
-        20% { 
-          text-shadow: -2px 0 #ff0000, 2px 0 #00ff00, 0 0 10px currentColor;
-        }
-        40% { 
-          text-shadow: 2px 0 #ff0000, -2px 0 #00ff00, 0 0 10px currentColor;
-        }
-      }
-      #rpm-display {
-        animation: pulse 0.5s ease-in-out infinite;
-      }
-      #rpm-display.danger {
-        animation: pulse 0.2s ease-in-out infinite, shake 0.1s ease-in-out infinite, glitch 0.3s ease-in-out infinite;
-      }
-    `;
-    document.head.appendChild(style);
-    
     // Add warning text element
-    const warningText = document.createElement('div');
+    const warningText = this.createStyledElement('div', {
+      position: 'absolute',
+      top: '170px',
+      right: '10px',
+      width: '250px',
+      textAlign: 'center',
+      color: '#ff0000',
+      fontFamily: 'Courier New, monospace',
+      fontSize: '14px',
+      textTransform: 'uppercase',
+      letterSpacing: '2px',
+      display: 'none',
+      pointerEvents: 'none',
+      textShadow: '0 0 10px #ff0000'
+    }, '⚠️ DANGER ZONE ⚠️');
     warningText.id = 'rpm-warning';
-    warningText.style.position = 'absolute';
-    warningText.style.top = '170px';
-    warningText.style.right = '10px';
-    warningText.style.width = '250px';
-    warningText.style.textAlign = 'center';
-    warningText.style.color = '#ff0000';
-    warningText.style.fontFamily = 'Courier New, monospace';
-    warningText.style.fontSize = '14px';
-    warningText.style.textTransform = 'uppercase';
-    warningText.style.letterSpacing = '2px';
-    warningText.style.display = 'none';
-    warningText.style.pointerEvents = 'none';
-    warningText.innerHTML = '⚠️ DANGER ZONE ⚠️';
-    warningText.style.textShadow = '0 0 10px #ff0000';
     document.body.appendChild(warningText);
     
     // Create l33t congratulatory message container
-    const congratsContainer = document.createElement('div');
+    const congratsContainer = this.createStyledElement('div', {
+      position: 'absolute',
+      top: '30%',
+      left: '50%',
+      transform: 'translate(-50%, -50%) scale(0.5) rotate(-5deg)',
+      fontSize: '48px',
+      fontFamily: 'Courier New, monospace',
+      fontWeight: 'bold',
+      color: '#00ff00',
+      textShadow: `
+        0 0 10px #00ff00,
+        3px 3px 0 #008800,
+        6px 6px 0 #004400,
+        9px 9px 0 #002200,
+        12px 12px 15px rgba(0,0,0,0.8)
+      `,
+      letterSpacing: '8px',
+      textAlign: 'center',
+      pointerEvents: 'none',
+      opacity: '0',
+      transition: 'none',
+      zIndex: '1000',
+      background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 100%)',
+      padding: '20px 40px',
+      border: '3px solid #00ff00',
+      borderRadius: '0',
+      boxShadow: `
+        inset 0 0 50px rgba(0,255,0,0.3),
+        0 0 30px rgba(0,255,0,0.5),
+        0 0 60px rgba(0,255,0,0.3)
+      `,
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap'
+    }, '<span class="congrats-text"></span>');
     congratsContainer.id = 'congrats-container';
-    congratsContainer.style.position = 'absolute';
-    congratsContainer.style.top = '30%';
-    congratsContainer.style.left = '50%';
-    congratsContainer.style.transform = 'translate(-50%, -50%)';
-    congratsContainer.style.fontSize = '48px';
-    congratsContainer.style.fontFamily = 'Courier New, monospace';
-    congratsContainer.style.fontWeight = 'bold';
-    congratsContainer.style.color = '#00ff00';
-    congratsContainer.style.textShadow = `
-      0 0 10px #00ff00,
-      3px 3px 0 #008800,
-      6px 6px 0 #004400,
-      9px 9px 0 #002200,
-      12px 12px 15px rgba(0,0,0,0.8)
-    `;
-    congratsContainer.style.letterSpacing = '8px';
-    congratsContainer.style.textAlign = 'center';
-    congratsContainer.style.pointerEvents = 'none';
-    congratsContainer.style.opacity = '0';
-    congratsContainer.style.transform = 'translate(-50%, -50%) scale(0.5) rotate(-5deg)';
-    congratsContainer.style.transition = 'none';
-    congratsContainer.style.zIndex = '1000';
-    congratsContainer.style.background = 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 100%)';
-    congratsContainer.style.padding = '20px 40px';
-    congratsContainer.style.border = '3px solid #00ff00';
-    congratsContainer.style.borderRadius = '0';
-    congratsContainer.style.boxShadow = `
-      inset 0 0 50px rgba(0,255,0,0.3),
-      0 0 30px rgba(0,255,0,0.5),
-      0 0 60px rgba(0,255,0,0.3)
-    `;
-    congratsContainer.style.textTransform = 'uppercase';
-    congratsContainer.style.whiteSpace = 'nowrap';
-    congratsContainer.innerHTML = '<span class="congrats-text"></span>';
     document.body.appendChild(congratsContainer);
-    
-    // Add additional CSS for congrats animation
-    const congratsStyle = document.createElement('style');
-    congratsStyle.textContent = `
-      @keyframes retroGlitch {
-        0% {
-          transform: translate(-50%, -50%) scale(1) rotate(0deg);
-          filter: hue-rotate(0deg);
-        }
-        10% {
-          transform: translate(-48%, -50%) scale(1) rotate(-1deg);
-          filter: hue-rotate(90deg) saturate(2);
-        }
-        20% {
-          transform: translate(-52%, -50%) scale(1.02) rotate(1deg);
-          filter: hue-rotate(180deg) saturate(3);
-        }
-        30% {
-          transform: translate(-50%, -48%) scale(1) rotate(0deg);
-          filter: hue-rotate(270deg) saturate(2);
-        }
-        40% {
-          transform: translate(-50%, -52%) scale(0.98) rotate(0deg);
-          filter: hue-rotate(0deg);
-        }
-        50% {
-          transform: translate(-49%, -50%) scale(1) rotate(0deg);
-          filter: hue-rotate(45deg);
-        }
-        60% {
-          transform: translate(-51%, -50%) scale(1.01) rotate(0deg);
-          filter: hue-rotate(0deg);
-        }
-        100% {
-          transform: translate(-50%, -50%) scale(1) rotate(0deg);
-          filter: hue-rotate(0deg);
-        }
-      }
-      
-      @keyframes scanlines {
-        0% {
-          background-position: 0 0;
-        }
-        100% {
-          background-position: 0 10px;
-        }
-      }
-      
-      @keyframes textGlitch {
-        0%, 100% {
-          text-shadow: 
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        20% {
-          text-shadow: 
-            -2px 0 #ff0000,
-            2px 0 #00ffff,
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        40% {
-          text-shadow: 
-            2px 0 #ff00ff,
-            -2px 0 #ffff00,
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8);
-        }
-        60% {
-          text-shadow: 
-            0 0 10px #00ff00,
-            3px 3px 0 #008800,
-            6px 6px 0 #004400,
-            9px 9px 0 #002200,
-            12px 12px 15px rgba(0,0,0,0.8),
-            0 0 30px #00ff00;
-        }
-      }
-      
-      #congrats-container {
-        image-rendering: pixelated;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: crisp-edges;
-      }
-      
-      #congrats-container::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: repeating-linear-gradient(
-          0deg,
-          rgba(0, 0, 0, 0.15),
-          rgba(0, 0, 0, 0.15) 1px,
-          transparent 1px,
-          transparent 2px
-        );
-        pointer-events: none;
-        animation: scanlines 8s linear infinite;
-      }
-      
-      #congrats-container.show {
-        animation: retroGlitch 0.4s ease-in-out infinite;
-      }
-      
-      #congrats-container.show .congrats-text {
-        animation: textGlitch 0.3s ease-in-out infinite;
-        display: inline-block;
-      }
-      
-      #congrats-container::after {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        background: linear-gradient(45deg, #00ff00, #00ff00 25%, transparent 25%, transparent 75%, #00ff00 75%);
-        z-index: -1;
-        opacity: 0.5;
-        filter: blur(1px);
-      }
-      
-      @keyframes screenShake {
-        0%, 100% { transform: translate(0, 0); }
-        10% { transform: translate(-2px, -2px); }
-        20% { transform: translate(2px, -2px); }
-        30% { transform: translate(-2px, 2px); }
-        40% { transform: translate(2px, 2px); }
-        50% { transform: translate(-1px, -1px); }
-        60% { transform: translate(1px, -1px); }
-        70% { transform: translate(-1px, 1px); }
-        80% { transform: translate(1px, 1px); }
-        90% { transform: translate(0, 0); }
-      }
-    `;
-    document.head.appendChild(congratsStyle);
   }
   
   private updateScore(): void {
@@ -1174,21 +1260,21 @@ export class Game {
     
     // Update roast message based on accuracy and shots fired
     const roastElement = document.getElementById('roast-message');
-    if (roastElement && this.shotsFired >= 3) { // Start roasting after 3 shots
+    if (roastElement && this.shotsFired >= GAME_CONFIG.MIN_SHOTS_FOR_ROAST) { // Start roasting after 3 shots
       let roastMessage = '';
       
       if (accuracy < 20) {
         // Brutal roasts for terrible accuracy
-        roastMessage = this.roastMessages[Math.floor(Math.random() * 20)];
+        roastMessage = this.getRandomElement(this.roastMessages.slice(0, 20));
       } else if (accuracy < 40) {
         // Medium roasts
-        roastMessage = this.roastMessages[20 + Math.floor(Math.random() * 15)];
+        roastMessage = this.getRandomElement(this.roastMessages.slice(20, 35));
       } else if (accuracy < 60) {
         // Light roasts
-        roastMessage = this.roastMessages[35 + Math.floor(Math.random() * 10)];
+        roastMessage = this.getRandomElement(this.roastMessages.slice(35, 45));
       } else if (accuracy < 80) {
         // Mild taunts
-        roastMessage = this.roastMessages[45 + Math.floor(Math.random() * 5)];
+        roastMessage = this.getRandomElement(this.roastMessages.slice(45, 50));
       } else {
         // Still roast them even if they're good
         roastMessage = '|| 2 E-Z 4 U? ||';
@@ -1216,7 +1302,7 @@ export class Game {
     if (!textElement) return;
     
     // Pick a random l33t message
-    const randomMessage = this.l33tMessages[Math.floor(Math.random() * this.l33tMessages.length)];
+    const randomMessage = this.getRandomElement(this.l33tMessages);
     textElement.textContent = randomMessage;
     
     // Random color scheme for retro feel
@@ -1227,7 +1313,7 @@ export class Game {
       { main: '#ffff00', border: '#ffff00' }, // Yellow
       { main: '#ff8800', border: '#ff8800' }  // Orange
     ];
-    const scheme = colorSchemes[Math.floor(Math.random() * colorSchemes.length)];
+    const scheme = this.getRandomElement(colorSchemes);
     textElement.style.color = scheme.main;
     congratsContainer.style.borderColor = scheme.border;
     congratsContainer.style.boxShadow = `
@@ -1331,16 +1417,16 @@ export class Game {
     
     // Update Bleda movement
     if (this.keys.left) {
-      this.bledaVelocity.x = -10;
+      this.bledaVelocity.x = -GAME_CONFIG.BLEDA_SPEED;
     } else if (this.keys.right) {
-      this.bledaVelocity.x = 10;
+      this.bledaVelocity.x = GAME_CONFIG.BLEDA_SPEED;
     } else {
       this.bledaVelocity.x *= 0.8; // Friction
     }
     
     // Update Bleda position
     this.bledaPosition.x += this.bledaVelocity.x * deltaTime;
-    this.bledaPosition.x = Math.max(-15, Math.min(15, this.bledaPosition.x)); // Keep within bounds
+    this.bledaPosition.x = Math.max(-GAME_CONFIG.BLEDA_BOUNDS, Math.min(GAME_CONFIG.BLEDA_BOUNDS, this.bledaPosition.x)); // Keep within bounds
     this.bleda.position.x = this.bledaPosition.x;
     
     // Animate horse when moving
@@ -1382,7 +1468,7 @@ export class Game {
         arrow.mesh.position.add(arrow.velocity.clone().multiplyScalar(deltaTime));
         
         // Add gravity to arrows for realistic arc
-        arrow.velocity.y -= 15 * deltaTime;
+        arrow.velocity.y -= GAME_CONFIG.GRAVITY * deltaTime;
         
         // Rotate arrow to follow its trajectory
         const direction = arrow.velocity.clone().normalize();
