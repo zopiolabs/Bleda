@@ -1,0 +1,23 @@
+{
+  "name": "bleda",
+  "version": "1.0.0",
+  "description": "Bleda game project",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": ["game", "threejs", "typescript"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/three": "^0.160.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
