@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "release": "npm version patch && git push --follow-tags"
   },
   "keywords": ["game", "threejs", "typescript"],
   "author": "",
