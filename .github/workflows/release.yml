@@ -50,6 +50,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           skip-version-file: false
           skip-on-empty: false
+          git-push: false
+
+      - name: Push changes
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
+        run: |
+          git push origin main --follow-tags || echo "Push failed, possibly due to existing tag"
 
       - name: Create game bundle
         if: ${{ steps.changelog.outputs.skipped == 'false' }}
