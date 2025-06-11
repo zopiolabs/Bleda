@@ -18,13 +18,13 @@ This document outlines the branch protection rules for the main branch and provi
 The following GitHub Actions workflows must pass before merging:
 
 ### From `validate-pr.yml` (Workflow: "Validate PR"):
-- `Validate PR / quick-checks` - PR title and commit message validation
-- `Validate PR / code-quality` - TypeScript type checking and security audit
-- `Validate PR / build-matrix (18.x)` - Build verification on Node 18
-- `Validate PR / build-matrix (20.x)` - Build verification on Node 20
-- `Validate PR / build-matrix (22.x)` - Build verification on Node 22
-- `Validate PR / performance` - Bundle size comparison
-- `Validate PR / pr-status-report` - Overall PR validation summary
+- `Validate PR / Quick Validations` - PR title and commit message validation
+- `Validate PR / Code Quality` - TypeScript type checking and security audit
+- `Validate PR / Build (Node 18.x)` - Build verification on Node 18
+- `Validate PR / Build (Node 20.x)` - Build verification on Node 20
+- `Validate PR / Build (Node 22.x)` - Build verification on Node 22
+- `Validate PR / Performance Checks` - Bundle size comparison
+- `Validate PR / PR Status Report` - Overall PR validation summary
 
 ### From `build.yml` (Workflow: "Build and Test"):
 - `Build and Test / build (18.x)` - Build and test on Node 18
@@ -49,13 +49,13 @@ The following GitHub Actions workflows must pass before merging:
 - [x] Require status checks to pass before merging
   - [x] Require branches to be up to date before merging
   - Required status checks:
-    - `Validate PR / quick-checks`
-    - `Validate PR / code-quality`
-    - `Validate PR / build-matrix (18.x)`
-    - `Validate PR / build-matrix (20.x)`
-    - `Validate PR / build-matrix (22.x)`
-    - `Validate PR / performance`
-    - `Validate PR / pr-status-report`
+    - `Validate PR / Quick Validations`
+    - `Validate PR / Code Quality`
+    - `Validate PR / Build (Node 18.x)`
+    - `Validate PR / Build (Node 20.x)`
+    - `Validate PR / Build (Node 22.x)`
+    - `Validate PR / Performance Checks`
+    - `Validate PR / PR Status Report`
     - `Build and Test / build (18.x)`
     - `Build and Test / build (20.x)`
 

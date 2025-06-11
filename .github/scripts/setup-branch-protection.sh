@@ -79,15 +79,15 @@ setup_protection() {
     print_status "info" "Setting up branch protection for '$BRANCH' branch..."
     
     # Required status checks
-    # Note: GitHub Actions status checks include the workflow name
+    # Note: GitHub uses the job's display name (from 'name:' field) not the job ID
     local required_checks=(
-        "Validate PR / quick-checks"
-        "Validate PR / code-quality"
-        "Validate PR / build-matrix (18.x)"
-        "Validate PR / build-matrix (20.x)"
-        "Validate PR / build-matrix (22.x)"
-        "Validate PR / performance"
-        "Validate PR / pr-status-report"
+        "Validate PR / Quick Validations"
+        "Validate PR / Code Quality"
+        "Validate PR / Build (Node 18.x)"
+        "Validate PR / Build (Node 20.x)"
+        "Validate PR / Build (Node 22.x)"
+        "Validate PR / Performance Checks"
+        "Validate PR / PR Status Report"
         "Build and Test / build (18.x)"
         "Build and Test / build (20.x)"
     )
