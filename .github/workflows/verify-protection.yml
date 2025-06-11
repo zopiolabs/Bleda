@@ -30,6 +30,9 @@ jobs:
             exit 1
           fi
           
+          echo "📋 Validating CODEOWNERS syntax..."
+          echo "================================"
+          
           # Basic syntax validation
           errors=0
           line_num=0
@@ -42,23 +45,30 @@ jobs:
               continue
             fi
             
+            # Debug: Show the line being processed
+            echo "Processing line $line_num: '$line'"
+            
             # Check for valid pattern (should start with / or * or **)
             if ! [[ "$line" =~ ^[[:space:]]*[\*/] ]]; then
               echo "❌ Line $line_num: Invalid pattern - should start with /, *, or **"
+              echo "   Line content: '$line'"
               ((errors++))
             fi
             
             # Check for team/user mentions (should contain @)
             if ! [[ "$line" =~ @ ]]; then
               echo "❌ Line $line_num: No owner specified - should contain @username or @org/team"
+              echo "   Line content: '$line'"
               ((errors++))
             fi
           done < .github/CODEOWNERS
           
+          echo "================================"
+          
           if [ $errors -eq 0 ]; then
             echo "✅ CODEOWNERS syntax validation passed"
           else
-            echo "Found $errors syntax errors"
+            echo "❌ Found $errors syntax errors in CODEOWNERS file"
             exit 1
           fi
 
