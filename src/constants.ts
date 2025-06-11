@@ -202,3 +202,179 @@ export const OBSTACLE_MESSAGES = {
     [ObstacleType.BIRD]: '|| B1RDS 4PPR04CH1NG! ||'
   }
 } as const;
+
+export enum TargetType {
+  STANDARD = 'STANDARD',
+  GOLD = 'GOLD',
+  SPEED = 'SPEED',
+  BONUS = 'BONUS',
+  SHRINKING = 'SHRINKING',
+  SPLIT = 'SPLIT',
+  MYSTERY = 'MYSTERY',
+  GHOST = 'GHOST',
+  MAGNETIC = 'MAGNETIC',
+  EXPLOSIVE = 'EXPLOSIVE'
+}
+
+export const TARGET_CONFIG = {
+  // General target settings
+  MAX_TARGETS_ON_WHEEL: 5,
+  SPAWN_CHECK_INTERVAL: 3000, // Check for new target spawns every 3 seconds
+  
+  // Combo system
+  COMBO_TIME_WINDOW: 2000, // 2 seconds to maintain combo
+  COMBO_MULTIPLIER_INCREMENT: 0.5,
+  MAX_COMBO_MULTIPLIER: 5,
+  
+  // Target type configurations
+  STANDARD: {
+    POINTS: 10,
+    SIZE: 0.4,
+    COLOR: 0xFF0000,
+    SPAWN_CHANCE: 1, // Always spawns
+    LIFETIME: null, // Permanent
+    ICON: '🎯',
+    NAME: 'STANDARD'
+  },
+  
+  GOLD: {
+    POINTS: 50,
+    SIZE: 0.32, // 80% of standard
+    COLOR: 0xFFD700,
+    SPAWN_CHANCE: 0.3,
+    LIFETIME: 15000, // 15 seconds
+    GLOW_INTENSITY: 2,
+    PARTICLE_COUNT: 10,
+    ICON: '⭐',
+    NAME: 'GOLD TARGET'
+  },
+  
+  SPEED: {
+    POINTS: 25,
+    SIZE: 0.24, // 60% of standard
+    COLOR: 0x00BFFF,
+    SPAWN_CHANCE: 0.4,
+    LIFETIME: 20000,
+    SPEED_MULTIPLIER: 2.5,
+    TRAIL_LENGTH: 5,
+    ICON: '💨',
+    NAME: 'SPEED DEMON'
+  },
+  
+  BONUS: {
+    POINTS: 100,
+    SIZE: 0.48, // 120% of standard
+    COLOR: 0xFF1493,
+    SPAWN_CHANCE: 0.1,
+    LIFETIME: 5000, // 5 seconds only!
+    PULSE_SPEED: 2,
+    RAINBOW_SPEED: 3,
+    ICON: '💎',
+    NAME: 'BONUS TARGET'
+  },
+  
+  SHRINKING: {
+    POINTS_MAX: 75,
+    POINTS_MIN: 10,
+    SIZE_START: 0.6,
+    SIZE_MIN: 0.2,
+    SHRINK_RATE: 0.85, // Shrinks to 85% on each miss
+    MAX_MISSES: 3,
+    COLOR_START: 0xFF0000,
+    COLOR_END: 0xFFFF00,
+    SPAWN_CHANCE: 0.25,
+    ICON: '🎈',
+    NAME: 'SHRINKING TARGET'
+  },
+  
+  SPLIT: {
+    POINTS: 30,
+    SIZE: 0.5,
+    COLOR: 0x00FF00,
+    SPAWN_CHANCE: 0.2,
+    MAX_SPLITS: 2,
+    SPLIT_SIZE_MULTIPLIER: 0.7,
+    SPLIT_ANGLE: Math.PI / 6, // 30 degrees
+    ICON: '🧬',
+    NAME: 'SPLIT TARGET'
+  },
+  
+  MYSTERY: {
+    POINTS: 0, // Determined on hit
+    SIZE: 0.4,
+    COLOR: 0x9400D3,
+    SPAWN_CHANCE: 0.15,
+    LIFETIME: 10000,
+    TRANSFORM_EFFECT_DURATION: 500,
+    QUESTION_MARK_SPIN_SPEED: 2,
+    ICON: '❓',
+    NAME: 'MYSTERY BOX'
+  },
+  
+  GHOST: {
+    POINTS: 40,
+    SIZE: 0.35,
+    COLOR: 0xE6E6FA,
+    SPAWN_CHANCE: 0.2,
+    LIFETIME: 25000,
+    PHASE_DURATION: 3000, // 3 seconds visible, 3 seconds invisible
+    FADE_SPEED: 0.5,
+    ICON: '👻',
+    NAME: 'GHOST TARGET'
+  },
+  
+  MAGNETIC: {
+    POINTS: 35,
+    SIZE: 0.4,
+    COLOR: 0xFF6347,
+    SPAWN_CHANCE: 0.25,
+    LIFETIME: 20000,
+    MAGNETIC_RANGE: 3,
+    MAGNETIC_FORCE: 0.3,
+    ELECTRIC_ARC_COLOR: 0x00FFFF,
+    ICON: '🧲',
+    NAME: 'MAGNETIC TARGET'
+  },
+  
+  EXPLOSIVE: {
+    POINTS: 20,
+    SIZE: 0.45,
+    COLOR: 0xFF4500,
+    SPAWN_CHANCE: 0.2,
+    LIFETIME: 15000,
+    EXPLOSION_RADIUS: 2,
+    CHAIN_EXPLOSION_CHANCE: 0.3,
+    SHRAPNEL_COUNT: 8,
+    ICON: '💣',
+    NAME: 'EXPLOSIVE TARGET'
+  }
+} as const;
+
+export const TARGET_MESSAGES = {
+  HIT: {
+    [TargetType.STANDARD]: '|| N1C3 SH0T! ||',
+    [TargetType.GOLD]: '|| G0LD STR1K3! ++B0NUS++ ||',
+    [TargetType.SPEED]: '|| SP33D D3M0N D0WN! ||',
+    [TargetType.BONUS]: '|| J4CKP0T! 100 P01NTS! ||',
+    [TargetType.SHRINKING]: '|| SHR1NK3R H1T! ||',
+    [TargetType.SPLIT]: '|| SPL1T T4RG3T! ||',
+    [TargetType.MYSTERY]: '|| MYST3RY R3V34L3D! ||',
+    [TargetType.GHOST]: '|| GH0ST BUST3D! ||',
+    [TargetType.MAGNETIC]: '|| M4GN3T1C STR1K3! ||',
+    [TargetType.EXPLOSIVE]: '|| B00M! 3XPL0S1V3 H1T! ||'
+  },
+  SPAWN: {
+    [TargetType.GOLD]: '|| G0LD T4RG3T 4PP34R3D! ||',
+    [TargetType.BONUS]: '|| B0NUS T4RG3T! HURRY! ||',
+    [TargetType.MYSTERY]: '|| MYST3RY B0X SP4WN3D! ||'
+  },
+  COMBO: [
+    '|| D0UBL3 K1LL! ||',
+    '|| TR1PL3 STR1K3! ||',
+    '|| QU4D D4M4G3! ||',
+    '|| P3NT4 SH0T! ||',
+    '|| M3G4 C0MB0! ||',
+    '|| ULTR4 K1LL! ||',
+    '|| G0DL1K3! ||'
+  ]
+} as const;

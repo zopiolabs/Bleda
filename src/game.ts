@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { COLORS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, POWERUP_MESSAGES, ObstacleType, OBSTACLE_CONFIG, OBSTACLE_MESSAGES } from './constants';
+import { COLORS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, POWERUP_MESSAGES, ObstacleType, OBSTACLE_CONFIG, OBSTACLE_MESSAGES, TargetType, TARGET_CONFIG, TARGET_MESSAGES } from './constants';
 import { UIManager } from './ui-manager';
 import { PowerUp, PowerUpEffect } from './powerup';
 import { Obstacle, FlyingRock, Tree, Bird } from './obstacle';
+import { Target, StandardTarget, GoldTarget, SpeedTarget, BonusTarget, ShrinkingTarget, SplitTarget, MysteryTarget, GhostTarget, MagneticTarget, ExplosiveTarget } from './target';
 
 interface Arrow {
   mesh: THREE.Group | THREE.Mesh;
@@ -20,7 +21,7 @@ export class Game {
   // Game objects
   private bleda!: THREE.Group;
   private wheel!: THREE.Group;
-  private ball!: THREE.Mesh;
+  private targets: Target[] = [];
   private arrows: Arrow[] = [];
   private ground!: THREE.Mesh;
   private bow!: THREE.Group;
@@ -53,6 +54,14 @@ export class Game {
   private lastObstacleSpawn = 0;
   private isStunned = false;
   private stunnedUntil = 0;
+  
+  // Targets
+  private lastTargetCheck = 0;
+  
+  // Combo system
+  private comboCount = 0;
+  private lastHitTime = 0;
+  private comboMultiplier = 1;
   
   // Controls
   private keys = {
@@ -495,17 +504,13 @@ export class Game {
     );
     spokes.forEach(spoke => this.wheel.add(spoke));
     
-    // Ball - smaller
-    const ballGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-    this.ball = this.createMesh(ballGeometry, COLORS.BALL, {
-      position: { x: GAME_CONFIG.WHEEL_RADIUS - 0.5 },
-      castShadow: true
-    });
-    
     this.wheel.add(wheelMesh);
-    this.wheel.add(this.ball);
     this.wheel.position.set(0, GAME_CONFIG.WHEEL_RADIUS + 2, -15);
-    // No rotation needed - wheel is already vertical
+    
+    // Create initial standard target
+    const standardTarget = new StandardTarget(GAME_CONFIG.WHEEL_RADIUS - 0.5, 0);
+    this.targets.push(standardTarget);
+    this.wheel.add(standardTarget.mesh);
     
     this.scene.add(this.wheel);
   }
@@ -633,45 +638,105 @@ export class Game {
   }
   
   private checkCollisions(): void {
-    // Get ball world position
-    const ballWorldPos = new THREE.Vector3();
-    this.ball.getWorldPosition(ballWorldPos);
-    
     // Check each active arrow
     this.arrows.forEach(arrow => {
       if (!arrow.active) return;
       
-      // Check collision with ball
-      const distance = arrow.mesh.position.distanceTo(ballWorldPos);
-      const hitRadius = arrow.isExplosive ? POWERUP_CONFIG.EXPLOSIVE_ARROWS.EXPLOSION_RADIUS : 1.0;
+      // Check collision with targets
+      let hitAnyTarget = false;
+      const targetsToRemove: Target[] = [];
+      const newTargetsToAdd: Target[] = [];
       
-      if (distance < hitRadius) {
-        // Hit!
-        arrow.active = false;
-        arrow.mesh.position.y = -100; // Hide arrow
+      this.targets.forEach(target => {
+        if (!target.isActive || !arrow.active) return;
         
-        // Calculate score with multiplier
-        const baseScore = arrow.isExplosive ? POWERUP_CONFIG.EXPLOSIVE_ARROWS.EXPLOSION_DAMAGE_MULTIPLIER : 1;
-        const scoreGain = baseScore * this.scoreMultiplier;
-        this.score += scoreGain;
-        
-        this.wheelSpeed *= 1.2; // Increase wheel speed
-        this.uiManager.updateScore(this.score);
-        this.uiManager.incrementShotsHit(); // This also shows congrats message
-        
-        // Create explosion effect for explosive arrows
-        if (arrow.isExplosive) {
-          this.createExplosionEffect(arrow.mesh.position.clone());
+        // Apply magnetic force if applicable
+        if (target instanceof MagneticTarget) {
+          const magneticForce = target.getMagneticForce(arrow.mesh.position);
+          if (magneticForce) {
+            arrow.velocity.add(magneticForce);
+          }
         }
         
-        // Flash effect
-        const ballMaterial = this.ball.material as THREE.MeshLambertMaterial;
-        const originalColor = ballMaterial.color.getHex();
-        ballMaterial.color.setHex(arrow.isExplosive ? 0xFF4500 : 0xFFFF00);
-        setTimeout(() => {
-          ballMaterial.color.setHex(originalColor);
-        }, 200);
+        if (target.checkCollision(arrow.mesh.position)) {
+          // Hit!
+          hitAnyTarget = true;
+          arrow.active = false;
+          arrow.mesh.position.y = -100; // Hide arrow
+          
+          const hitResult = target.onHit();
+          
+          // Calculate score with multipliers
+          const baseScore = hitResult.points;
+          const totalMultiplier = this.scoreMultiplier * this.comboMultiplier;
+          const scoreGain = Math.round(baseScore * totalMultiplier);
+          this.score += scoreGain;
+          
+          // Update combo
+          this.updateCombo();
+          
+          this.wheelSpeed *= 1.1; // Increase wheel speed slightly
+          this.uiManager.updateScore(this.score);
+          this.uiManager.incrementShotsHit();
+          
+          // Show target hit message
+          this.uiManager.showTargetHit(TARGET_MESSAGES.HIT[target.type], target.type, scoreGain);
+          
+          // Handle special effects
+          if (hitResult.special) {
+            this.handleSpecialTargetEffect(hitResult.special, target);
+          }
+          
+          // Create hit effect
+          this.createTargetHitEffect(target);
+          
+          // Mark for removal if not already deactivated
+          if (!target.isActive) {
+            targetsToRemove.push(target);
+          }
+          
+          // Handle split targets
+          if (hitResult.special?.type === 'split') {
+            const splitAngles = hitResult.special.angles;
+            splitAngles.forEach((angle: number) => {
+              const splitTarget = new SplitTarget(
+                GAME_CONFIG.WHEEL_RADIUS - 0.5,
+                angle,
+                hitResult.special.splitLevel
+              );
+              newTargetsToAdd.push(splitTarget);
+            });
+          }
+        }
+      });
+      
+      // Update missed targets
+      if (!hitAnyTarget && arrow.active) {
+        // Check if arrow passed through wheel area
+        if (arrow.mesh.position.z < -20 && arrow.mesh.position.z > -10) {
+          this.targets.forEach(target => {
+            if (target.isActive) {
+              target.onMiss();
+            }
+          });
+        }
       }
+      
+      // Remove hit targets
+      targetsToRemove.forEach(target => {
+        const index = this.targets.indexOf(target);
+        if (index > -1) {
+          this.targets.splice(index, 1);
+          this.wheel.remove(target.mesh);
+          target.dispose();
+        }
+      });
+      
+      // Add new targets (like splits)
+      newTargetsToAdd.forEach(newTarget => {
+        this.targets.push(newTarget);
+        this.wheel.add(newTarget.mesh);
+      });
       
       // Check collision with power-ups
       this.powerUps.forEach(powerUp => {
@@ -840,6 +905,10 @@ export class Game {
     // Update obstacles
     this.updateObstacles(deltaTime);
     
+    // Update targets
+    const elapsedTime = Date.now() / 1000;
+    this.updateTargets(deltaTime, elapsedTime);
+    
     // Update active power-ups display
     const currentTime = Date.now();
     const activePowerUpsDisplay = this.activePowerUps.map(effect => ({
@@ -878,6 +947,12 @@ export class Game {
     this.obstacles.forEach(obstacle => {
       this.scene.remove(obstacle.mesh);
       obstacle.dispose();
+    });
+    
+    // Dispose targets
+    this.targets.forEach(target => {
+      this.wheel.remove(target.mesh);
+      target.dispose();
     });
   }
   
@@ -1155,6 +1230,298 @@ export class Game {
       }
     };
     shakeAnimation();
+  }
+  
+  private updateCombo(): void {
+    const currentTime = Date.now();
+    
+    if (currentTime - this.lastHitTime <= TARGET_CONFIG.COMBO_TIME_WINDOW) {
+      this.comboCount++;
+      this.comboMultiplier = Math.min(
+        1 + this.comboCount * TARGET_CONFIG.COMBO_MULTIPLIER_INCREMENT,
+        TARGET_CONFIG.MAX_COMBO_MULTIPLIER
+      );
+      
+      // Show combo message
+      if (this.comboCount > 1 && this.comboCount <= TARGET_MESSAGES.COMBO.length) {
+        this.uiManager.showComboMessage(
+          TARGET_MESSAGES.COMBO[this.comboCount - 2],
+          this.comboCount
+        );
+      }
+    } else {
+      this.comboCount = 1;
+      this.comboMultiplier = 1;
+    }
+    
+    this.lastHitTime = currentTime;
+    this.uiManager.updateComboDisplay(this.comboCount, this.comboMultiplier);
+  }
+  
+  private handleSpecialTargetEffect(special: any, target: Target): void {
+    switch (special.type) {
+      case 'explosive':
+        this.createExplosionEffect(target.mesh.position.clone());
+        
+        // Check for chain explosions
+        this.targets.forEach(otherTarget => {
+          if (otherTarget !== target && otherTarget.isActive) {
+            const distance = target.mesh.position.distanceTo(otherTarget.mesh.position);
+            if (distance < special.explosionRadius) {
+              // Chain explosion
+              if (Math.random() < special.chainChance) {
+                const hitResult = otherTarget.onHit();
+                const scoreGain = Math.round(hitResult.points * this.scoreMultiplier * this.comboMultiplier);
+                this.score += scoreGain;
+                this.uiManager.updateScore(this.score);
+                this.createTargetHitEffect(otherTarget);
+              }
+            }
+          }
+        });
+        break;
+        
+      case 'mystery':
+        const reward = special.reward;
+        this.uiManager.showMysteryReveal(reward.message);
+        
+        if (reward.powerUp) {
+          // Spawn random power-up
+          this.spawnPowerUp();
+        } else if (reward.multiball) {
+          // Add extra targets
+          this.spawnSpecialTargets(3);
+        }
+        break;
+    }
+  }
+  
+  private createTargetHitEffect(target: Target): void {
+    const worldPos = new THREE.Vector3();
+    target.mesh.getWorldPosition(worldPos);
+    
+    // Create hit particles based on target type
+    const particleCount = 15;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    const targetColor = new THREE.Color(this.getTargetConfig(target.type).COLOR);
+    
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] = worldPos.x + (Math.random() - 0.5) * 1;
+      positions[i3 + 1] = worldPos.y + (Math.random() - 0.5) * 1;
+      positions[i3 + 2] = worldPos.z + (Math.random() - 0.5) * 1;
+      
+      colors[i3] = targetColor.r;
+      colors[i3 + 1] = targetColor.g;
+      colors[i3 + 2] = targetColor.b;
+      
+      sizes[i] = Math.random() * 0.3 + 0.2;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 0.3,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending
+    });
+    
+    const particles = new THREE.Points(geometry, material);
+    this.scene.add(particles);
+    
+    // Animate particles
+    let opacity = 1;
+    const animateParticles = () => {
+      opacity -= 0.02;
+      material.opacity = opacity;
+      
+      const positions = geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < positions.length; i += 3) {
+        positions[i] += (Math.random() - 0.5) * 0.1;
+        positions[i + 1] += Math.random() * 0.1;
+        positions[i + 2] += (Math.random() - 0.5) * 0.1;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      
+      if (opacity > 0) {
+        requestAnimationFrame(animateParticles);
+      } else {
+        this.scene.remove(particles);
+        geometry.dispose();
+        material.dispose();
+      }
+    };
+    
+    animateParticles();
+  }
+  
+  private getTargetConfig(type: TargetType): any {
+    switch (type) {
+      case TargetType.STANDARD: return TARGET_CONFIG.STANDARD;
+      case TargetType.GOLD: return TARGET_CONFIG.GOLD;
+      case TargetType.SPEED: return TARGET_CONFIG.SPEED;
+      case TargetType.BONUS: return TARGET_CONFIG.BONUS;
+      case TargetType.SHRINKING: return TARGET_CONFIG.SHRINKING;
+      case TargetType.SPLIT: return TARGET_CONFIG.SPLIT;
+      case TargetType.MYSTERY: return TARGET_CONFIG.MYSTERY;
+      case TargetType.GHOST: return TARGET_CONFIG.GHOST;
+      case TargetType.MAGNETIC: return TARGET_CONFIG.MAGNETIC;
+      case TargetType.EXPLOSIVE: return TARGET_CONFIG.EXPLOSIVE;
+      default: return TARGET_CONFIG.STANDARD;
+    }
+  }
+  
+  private spawnTarget(): void {
+    if (this.targets.length >= TARGET_CONFIG.MAX_TARGETS_ON_WHEEL) {
+      return;
+    }
+    
+    // Get available spawn positions
+    const occupiedAngles = this.targets.map(t => t.wheelAngle);
+    const minAngleDistance = Math.PI / 4; // Minimum 45 degrees between targets
+    
+    // Find valid spawn angle
+    let validAngle: number | null = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const testAngle = Math.random() * Math.PI * 2;
+      let isValid = true;
+      
+      for (const occupiedAngle of occupiedAngles) {
+        const angleDiff = Math.abs(testAngle - occupiedAngle);
+        if (angleDiff < minAngleDistance || angleDiff > Math.PI * 2 - minAngleDistance) {
+          isValid = false;
+          break;
+        }
+      }
+      
+      if (isValid) {
+        validAngle = testAngle;
+        break;
+      }
+    }
+    
+    if (validAngle === null) return;
+    
+    // Choose target type based on spawn chances
+    const targetTypes = [
+      { type: TargetType.GOLD, chance: TARGET_CONFIG.GOLD.SPAWN_CHANCE },
+      { type: TargetType.SPEED, chance: TARGET_CONFIG.SPEED.SPAWN_CHANCE },
+      { type: TargetType.BONUS, chance: TARGET_CONFIG.BONUS.SPAWN_CHANCE },
+      { type: TargetType.SHRINKING, chance: TARGET_CONFIG.SHRINKING.SPAWN_CHANCE },
+      { type: TargetType.SPLIT, chance: TARGET_CONFIG.SPLIT.SPAWN_CHANCE },
+      { type: TargetType.MYSTERY, chance: TARGET_CONFIG.MYSTERY.SPAWN_CHANCE },
+      { type: TargetType.GHOST, chance: TARGET_CONFIG.GHOST.SPAWN_CHANCE },
+      { type: TargetType.MAGNETIC, chance: TARGET_CONFIG.MAGNETIC.SPAWN_CHANCE },
+      { type: TargetType.EXPLOSIVE, chance: TARGET_CONFIG.EXPLOSIVE.SPAWN_CHANCE }
+    ];
+    
+    const random = Math.random();
+    let cumulativeChance = 0;
+    let selectedType: TargetType | null = null;
+    
+    for (const targetType of targetTypes) {
+      cumulativeChance += targetType.chance;
+      if (random <= cumulativeChance) {
+        selectedType = targetType.type;
+        break;
+      }
+    }
+    
+    if (!selectedType) return;
+    
+    // Create target
+    let newTarget: Target | null = null;
+    const radius = GAME_CONFIG.WHEEL_RADIUS - 0.5;
+    
+    switch (selectedType) {
+      case TargetType.GOLD:
+        newTarget = new GoldTarget(radius, validAngle);
+        break;
+      case TargetType.SPEED:
+        newTarget = new SpeedTarget(radius, validAngle);
+        break;
+      case TargetType.BONUS:
+        newTarget = new BonusTarget(radius, validAngle);
+        break;
+      case TargetType.SHRINKING:
+        newTarget = new ShrinkingTarget(radius, validAngle);
+        break;
+      case TargetType.SPLIT:
+        newTarget = new SplitTarget(radius, validAngle);
+        break;
+      case TargetType.MYSTERY:
+        newTarget = new MysteryTarget(radius, validAngle);
+        break;
+      case TargetType.GHOST:
+        newTarget = new GhostTarget(radius, validAngle);
+        break;
+      case TargetType.MAGNETIC:
+        newTarget = new MagneticTarget(radius, validAngle);
+        break;
+      case TargetType.EXPLOSIVE:
+        newTarget = new ExplosiveTarget(radius, validAngle);
+        break;
+    }
+    
+    if (newTarget) {
+      this.targets.push(newTarget);
+      this.wheel.add(newTarget.mesh);
+      
+      // Show spawn message for special targets
+      if (selectedType in TARGET_MESSAGES.SPAWN) {
+        this.uiManager.showTargetSpawn(TARGET_MESSAGES.SPAWN[selectedType as keyof typeof TARGET_MESSAGES.SPAWN], selectedType);
+      }
+    }
+  }
+  
+  private spawnSpecialTargets(count: number): void {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        this.spawnTarget();
+      }, i * 500); // Stagger spawns
+    }
+  }
+  
+  private updateTargets(deltaTime: number, elapsedTime: number): void {
+    const currentTime = Date.now();
+    
+    // Update all targets
+    this.targets.forEach(target => {
+      if (target.isActive) {
+        target.update(deltaTime, this.wheel.rotation.z, elapsedTime);
+      }
+    });
+    
+    // Remove inactive targets
+    this.targets = this.targets.filter(target => {
+      if (!target.isActive) {
+        this.wheel.remove(target.mesh);
+        target.dispose();
+        return false;
+      }
+      return true;
+    });
+    
+    // Check if we need to spawn new targets
+    if (currentTime - this.lastTargetCheck >= TARGET_CONFIG.SPAWN_CHECK_INTERVAL) {
+      this.spawnTarget();
+      this.lastTargetCheck = currentTime;
+    }
+    
+    // Ensure at least one standard target exists
+    if (this.targets.length === 0) {
+      const standardTarget = new StandardTarget(GAME_CONFIG.WHEEL_RADIUS - 0.5, 0);
+      this.targets.push(standardTarget);
+      this.wheel.add(standardTarget.mesh);
+    }
   }
   
   private createExplosionEffect(position: THREE.Vector3): void {

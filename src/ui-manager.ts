@@ -1,4 +1,4 @@
-import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, ObstacleType } from './constants';
+import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, ObstacleType, TargetType } from './constants';
 import { ROAST_MESSAGES, L33T_MESSAGES } from './messages';
 
 export class UIManager {
@@ -155,6 +155,28 @@ export class UIManager {
           { at: '0%, 100%', style: 'transform: translateX(-50%) rotate(0deg);' },
           { at: '25%', style: 'transform: translateX(-48%) rotate(-2deg);' },
           { at: '75%', style: 'transform: translateX(-52%) rotate(2deg);' }
+        ]
+      },
+      {
+        name: 'comboShake',
+        frames: [
+          { at: '0%, 100%', style: 'transform: translateX(0) scale(1) rotate(0deg);' },
+          { at: '25%', style: 'transform: translateX(-5px) scale(1.1) rotate(-5deg);' },
+          { at: '75%', style: 'transform: translateX(5px) scale(1.1) rotate(5deg);' }
+        ]
+      },
+      {
+        name: 'spawnPulse',
+        frames: [
+          { at: '0%', style: 'box-shadow: 0 0 0 0 currentColor;' },
+          { at: '100%', style: 'box-shadow: 0 0 20px 10px transparent;' }
+        ]
+      },
+      {
+        name: 'mysteryParticle',
+        frames: [
+          { at: '0%', style: 'transform: translate(0, 0) scale(1); opacity: 1;' },
+          { at: '100%', style: 'transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0;' }
         ]
       }
     ],
@@ -809,6 +831,295 @@ export class UIManager {
       collisionDisplay.style.opacity = '0';
       collisionDisplay.style.transform = 'translateX(-50%) scale(0.8)';
       collisionDisplay.style.animation = '';
+    }, 2000);
+  }
+  
+  public showTargetHit(message: string, type: TargetType, points: number): void {
+    // Create or get target hit display
+    let hitDisplay = document.getElementById('target-hit');
+    if (!hitDisplay) {
+      hitDisplay = this.createUIContainer({
+        bottom: '60%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '28px',
+        fontWeight: 'bold',
+        textShadow: '0 0 20px currentColor',
+        letterSpacing: '3px',
+        textAlign: 'center',
+        zIndex: '1000',
+        opacity: '0',
+        transition: 'all 0.3s ease-out',
+        pointerEvents: 'none',
+        textTransform: 'uppercase'
+      }, 'target-hit');
+      document.body.appendChild(hitDisplay);
+    }
+    
+    // Get target color
+    const targetColor = this.getTargetColor(type);
+    hitDisplay.style.color = targetColor;
+    hitDisplay.innerHTML = `${message}<br><span style="font-size: 20px;">+${points} P01NTS</span>`;
+    
+    // Animate in
+    hitDisplay.style.opacity = '0';
+    hitDisplay.style.transform = 'translateX(-50%) translateY(20px) scale(0.8)';
+    
+    // Force reflow
+    hitDisplay.offsetHeight;
+    
+    hitDisplay.style.opacity = '1';
+    hitDisplay.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+    
+    // Hide after delay
+    setTimeout(() => {
+      hitDisplay.style.opacity = '0';
+      hitDisplay.style.transform = 'translateX(-50%) translateY(-20px) scale(1.2)';
+    }, 1500);
+  }
+  
+  private getTargetColor(type: TargetType): string {
+    const colors: Record<TargetType, string> = {
+      [TargetType.STANDARD]: '#FF0000',
+      [TargetType.GOLD]: '#FFD700',
+      [TargetType.SPEED]: '#00BFFF',
+      [TargetType.BONUS]: '#FF1493',
+      [TargetType.SHRINKING]: '#FF0000',
+      [TargetType.SPLIT]: '#00FF00',
+      [TargetType.MYSTERY]: '#9400D3',
+      [TargetType.GHOST]: '#E6E6FA',
+      [TargetType.MAGNETIC]: '#FF6347',
+      [TargetType.EXPLOSIVE]: '#FF4500'
+    };
+    return colors[type] || '#FFFFFF';
+  }
+  
+  public showComboMessage(message: string, comboCount: number): void {
+    // Create or get combo display
+    let comboDisplay = document.getElementById('combo-display');
+    if (!comboDisplay) {
+      comboDisplay = this.createUIContainer({
+        top: '30%',
+        right: '20px',
+        fontSize: '36px',
+        fontWeight: 'bold',
+        color: '#FFD700',
+        textShadow: '0 0 30px #FFD700, 0 0 60px #FFD700',
+        letterSpacing: '4px',
+        textAlign: 'right',
+        zIndex: '1000',
+        opacity: '0',
+        transition: 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        pointerEvents: 'none',
+        textTransform: 'uppercase'
+      }, 'combo-display');
+      document.body.appendChild(comboDisplay);
+    }
+    
+    comboDisplay.textContent = message;
+    
+    // Animate with impact
+    comboDisplay.style.opacity = '0';
+    comboDisplay.style.transform = 'translateX(50px) scale(0.5) rotate(-10deg)';
+    
+    // Force reflow
+    comboDisplay.offsetHeight;
+    
+    comboDisplay.style.opacity = '1';
+    comboDisplay.style.transform = 'translateX(0) scale(1) rotate(0deg)';
+    
+    // Add shake effect for high combos
+    if (comboCount >= 5) {
+      comboDisplay.style.animation = 'comboShake 0.5s ease-out';
+    }
+    
+    // Hide after delay
+    setTimeout(() => {
+      comboDisplay.style.opacity = '0';
+      comboDisplay.style.transform = 'translateX(-50px) scale(0.8) rotate(10deg)';
+      comboDisplay.style.animation = '';
+    }, 2000);
+  }
+  
+  public updateComboDisplay(comboCount: number, comboMultiplier: number): void {
+    // Create or get combo counter
+    let comboCounter = document.getElementById('combo-counter');
+    if (!comboCounter) {
+      comboCounter = this.createUIContainer({
+        top: '150px',
+        right: '270px',
+        width: '200px',
+        background: 'linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,140,0,0.2) 100%)',
+        border: '2px solid #FFD700',
+        borderRadius: '10px',
+        padding: '15px',
+        display: 'none'
+      }, 'combo-counter');
+      document.body.appendChild(comboCounter);
+    }
+    
+    if (comboCount > 1) {
+      comboCounter.style.display = 'block';
+      comboCounter.innerHTML = `
+        <div style="color: #FFD700; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+          [[ C0MB0 ]]
+        </div>
+        <div style="font-size: 32px; color: #FFD700; text-shadow: 0 0 10px #FFD700; font-weight: bold; text-align: center;">
+          x${comboCount}
+        </div>
+        <div style="font-size: 18px; color: #FFA500; text-align: center; margin-top: 5px;">
+          ${comboMultiplier.toFixed(1)}x MULT1PL13R
+        </div>
+      `;
+    } else {
+      comboCounter.style.display = 'none';
+    }
+  }
+  
+  public showMysteryReveal(message: string): void {
+    // Create mystery reveal effect
+    let mysteryReveal = document.getElementById('mystery-reveal');
+    if (!mysteryReveal) {
+      mysteryReveal = this.createUIContainer({
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        fontSize: '42px',
+        fontWeight: 'bold',
+        color: '#9400D3',
+        textShadow: '0 0 40px #9400D3, 0 0 80px #9400D3',
+        letterSpacing: '6px',
+        textAlign: 'center',
+        zIndex: '1001',
+        opacity: '0',
+        transition: 'none',
+        pointerEvents: 'none',
+        textTransform: 'uppercase',
+        background: 'radial-gradient(ellipse at center, rgba(148,0,211,0.3) 0%, transparent 70%)',
+        padding: '40px 60px',
+        borderRadius: '20px'
+      }, 'mystery-reveal');
+      document.body.appendChild(mysteryReveal);
+    }
+    
+    mysteryReveal.textContent = message;
+    
+    // Epic reveal animation
+    mysteryReveal.style.opacity = '0';
+    mysteryReveal.style.transform = 'translate(-50%, -50%) scale(0) rotate(720deg)';
+    mysteryReveal.style.filter = 'blur(10px)';
+    
+    // Force reflow
+    mysteryReveal.offsetHeight;
+    
+    mysteryReveal.style.transition = 'all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+    mysteryReveal.style.opacity = '1';
+    mysteryReveal.style.transform = 'translate(-50%, -50%) scale(1) rotate(0deg)';
+    mysteryReveal.style.filter = 'blur(0px)';
+    
+    // Add particle burst effect
+    this.createMysteryParticles();
+    
+    // Hide after delay
+    setTimeout(() => {
+      mysteryReveal.style.transition = 'all 0.3s ease-in';
+      mysteryReveal.style.opacity = '0';
+      mysteryReveal.style.transform = 'translate(-50%, -50%) scale(1.5)';
+      mysteryReveal.style.filter = 'blur(5px)';
+    }, 2500);
+  }
+  
+  private createMysteryParticles(): void {
+    const particleContainer = document.createElement('div');
+    particleContainer.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+      z-index: 1000;
+    `;
+    
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement('div');
+      const angle = (i / 20) * Math.PI * 2;
+      const speed = 200 + Math.random() * 200;
+      
+      particle.style.cssText = `
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #9400D3;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #9400D3;
+        animation: mysteryParticle 1s ease-out forwards;
+      `;
+      
+      particle.style.setProperty('--dx', `${Math.cos(angle) * speed}px`);
+      particle.style.setProperty('--dy', `${Math.sin(angle) * speed}px`);
+      
+      particleContainer.appendChild(particle);
+    }
+    
+    document.body.appendChild(particleContainer);
+    
+    // Remove after animation
+    setTimeout(() => {
+      document.body.removeChild(particleContainer);
+    }, 1000);
+  }
+  
+  public showTargetSpawn(message: string, type: TargetType): void {
+    // Create or get spawn notification
+    let spawnNotify = document.getElementById('target-spawn');
+    if (!spawnNotify) {
+      spawnNotify = this.createUIContainer({
+        top: '20%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '24px',
+        fontWeight: 'bold',
+        textShadow: '0 0 20px currentColor',
+        letterSpacing: '3px',
+        textAlign: 'center',
+        zIndex: '999',
+        opacity: '0',
+        transition: 'all 0.4s ease-out',
+        pointerEvents: 'none',
+        textTransform: 'uppercase',
+        background: 'rgba(0,0,0,0.7)',
+        padding: '15px 30px',
+        borderRadius: '10px',
+        border: '2px solid currentColor'
+      }, 'target-spawn');
+      document.body.appendChild(spawnNotify);
+    }
+    
+    const color = this.getTargetColor(type);
+    spawnNotify.style.color = color;
+    spawnNotify.style.borderColor = color;
+    spawnNotify.textContent = message;
+    
+    // Animate in from top
+    spawnNotify.style.opacity = '0';
+    spawnNotify.style.transform = 'translateX(-50%) translateY(-50px)';
+    
+    // Force reflow
+    spawnNotify.offsetHeight;
+    
+    spawnNotify.style.opacity = '1';
+    spawnNotify.style.transform = 'translateX(-50%) translateY(0)';
+    
+    // Add glow pulse
+    spawnNotify.style.animation = 'spawnPulse 0.6s ease-out';
+    
+    // Hide after delay
+    setTimeout(() => {
+      spawnNotify.style.opacity = '0';
+      spawnNotify.style.transform = 'translateX(-50%) translateY(50px)';
+      spawnNotify.style.animation = '';
     }, 2000);
   }
 }
