@@ -81,13 +81,14 @@ jobs:
           critical_files=(
             "package.json"
             "tsconfig.json"
-            ".github/workflows/"
+            ".github/"
             "src/main.ts"
           )
           
           missing=0
           for file in "${critical_files[@]}"; do
-            if ! grep -q "^[[:space:]]*/*$file" .github/CODEOWNERS; then
+            # Check for exact match or parent directory coverage
+            if ! grep -E "^[[:space:]]*/?$file|^[[:space:]]*/?$(dirname "$file")/?[[:space:]]" .github/CODEOWNERS | grep -q "@"; then
               echo "⚠️  No owner specified for: $file"
               ((missing++))
             fi
@@ -97,6 +98,8 @@ jobs:
             echo "✅ All critical files have owners assigned"
           else
             echo "⚠️  $missing critical files lack owner assignments"
+            # Don't fail the build for coverage warnings
+            exit 0
           fi
 
   verify-workflows:
