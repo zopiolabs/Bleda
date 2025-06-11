@@ -24,6 +24,8 @@ jobs:
 
       - name: Validate CODEOWNERS syntax
         run: |
+          set -euo pipefail
+          
           # Check if CODEOWNERS file exists
           if [ ! -f .github/CODEOWNERS ]; then
             echo "❌ CODEOWNERS file not found"
@@ -37,11 +39,12 @@ jobs:
           errors=0
           line_num=0
           
-          while IFS= read -r line; do
-            ((line_num++))
+          # Read file line by line (handle files without trailing newline)
+          while IFS= read -r line || [ -n "$line" ]; do
+            line_num=$((line_num + 1))
             
             # Skip empty lines and comments
-            if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+            if [[ -z "$line" || "$line" =~ ^[[:space:]]*#.*$ ]]; then
               continue
             fi
             
@@ -49,17 +52,17 @@ jobs:
             echo "Processing line $line_num: '$line'"
             
             # Check for valid pattern (should start with / or * or **)
-            if ! [[ "$line" =~ ^[[:space:]]*[\*/] ]]; then
+            if ! [[ "$line" =~ ^[[:space:]]*[/*].*$ ]]; then
               echo "❌ Line $line_num: Invalid pattern - should start with /, *, or **"
               echo "   Line content: '$line'"
-              ((errors++))
+              errors=$((errors + 1))
             fi
             
             # Check for team/user mentions (should contain @)
-            if ! [[ "$line" =~ @ ]]; then
+            if ! [[ "$line" =~ .*@.* ]]; then
               echo "❌ Line $line_num: No owner specified - should contain @username or @org/team"
               echo "   Line content: '$line'"
-              ((errors++))
+              errors=$((errors + 1))
             fi
           done < .github/CODEOWNERS
           
