@@ -1,0 +1,78 @@
+# CODEOWNERS for Bleda Game Project
+# 
+# This file defines code ownership for automatic review assignments.
+# Order matters: later rules override earlier ones.
+# Format: <pattern> <team>
+#
+# Teams:
+# @zopiolabs/core - Core infrastructure and architecture team
+# @zopiolabs/community-team - Feature development and community contributions
+#
+# Maintenance Notes:
+# - Update this file when adding new major features or restructuring
+# - Consider both teams for security-sensitive or API-breaking changes
+# - Patterns use gitignore syntax (see: https://git-scm.com/docs/gitignore)
+
+# ============================================
+# DEFAULT OWNERSHIP
+# ============================================
+# Community team reviews most game features by default
+* @zopiolabs/community-team
+
+# ============================================
+# INFRASTRUCTURE & CONFIGURATION
+# ============================================
+# Core team owns build configuration and tooling
+/package.json @zopiolabs/core
+/package-lock.json @zopiolabs/core
+/tsconfig.json @zopiolabs/core
+/vite.config.ts @zopiolabs/core
+/.github/ @zopiolabs/core
+/dist/ @zopiolabs/core
+
+# ============================================
+# DOCUMENTATION & GUIDELINES
+# ============================================
+# Both teams review documentation changes
+/README.md @zopiolabs/core @zopiolabs/community-team
+/CODING_GUIDELINES.md @zopiolabs/core @zopiolabs/community-team
+/CHANGELOG.md @zopiolabs/core @zopiolabs/community-team
+
+# ============================================
+# CORE GAME ARCHITECTURE
+# ============================================
+# Core team reviews fundamental game systems
+/src/main.ts @zopiolabs/core
+/src/constants.ts @zopiolabs/core
+
+# ============================================
+# GAME FEATURES & MECHANICS
+# ============================================
+# Community team owns gameplay features
+/src/game.ts @zopiolabs/community-team
+/src/obstacle.ts @zopiolabs/community-team
+/src/powerup.ts @zopiolabs/community-team
+/src/target.ts @zopiolabs/community-team
+/src/messages.ts @zopiolabs/community-team
+
+# ============================================
+# USER INTERFACE
+# ============================================
+# Community team manages UI components
+/src/ui-manager.ts @zopiolabs/community-team
+/index.html @zopiolabs/community-team
+
+# ============================================
+# SHARED OWNERSHIP AREAS
+# ============================================
+# Critical changes require both teams
+# (Add specific patterns here as the project grows)
+
+# ============================================
+# OWNERSHIP EXCEPTIONS
+# ============================================ß
+# Use negative patterns if needed to exclude specific files
+# Example: !**/test-*.ts would exclude test files
+
+# Meta: This CODEOWNERS file itself requires core team review
+/.github/CODEOWNERS @zopiolabs/core
