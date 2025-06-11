@@ -262,9 +262,7 @@ bleda/
 - [ ] 🎵 Dynamic soundtrack and SFX
 - [ ] 🌍 Multiple environments/levels
 - [ ] 🏹 Weapon upgrades and customization
-- [ ] 🎮 Multiplayer mode
-- [ ] 📱 Mobile touch controls
-- [ ] 🎨 Character customization
+
 
 ### 🐛 Known Issues
 
