@@ -1,0 +1,329 @@
+name: Audit Branch Protection
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      notify:
+        description: 'Send notifications for issues'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit-protection:
+    name: Audit Protection Rules
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check branch protection settings
+        id: check-protection
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = 'main';
+            const expectedRules = {
+              requiredPullRequestReviews: {
+                requiredApprovingReviewCount: 1,
+                dismissStaleReviews: true,
+                requireCodeOwnerReviews: true
+              },
+              requiredStatusChecks: {
+                strict: true,
+                contexts: [
+                  'Validate PR / Quick Validations',
+                  'Validate PR / Code Quality',
+                  'Validate PR / Build (Node 18.x)',
+                  'Validate PR / Build (Node 20.x)',
+                  'Validate PR / Build (Node 22.x)',
+                  'Validate PR / Performance Checks',
+                  'Validate PR / PR Status Report',
+                  'Build and Test / build (18.x)',
+                  'Build and Test / build (20.x)'
+                ]
+              },
+              enforceAdmins: true,
+              restrictions: {
+                teams: ['core']
+              },
+              allowForcePushes: false,
+              allowDeletions: false
+            };
+            
+            let protection;
+            let issues = [];
+            
+            try {
+              protection = await github.rest.repos.getBranchProtection({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: branch
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                issues.push({
+                  severity: 'critical',
+                  message: `No protection rules found for ${branch} branch`
+                });
+                core.setOutput('has-issues', 'true');
+                core.setOutput('issues', JSON.stringify(issues));
+                return;
+              }
+              throw error;
+            }
+            
+            // Check PR requirements
+            if (!protection.data.required_pull_request_reviews) {
+              issues.push({
+                severity: 'critical',
+                message: 'Pull request reviews are not required'
+              });
+            } else {
+              const prReviews = protection.data.required_pull_request_reviews;
+              
+              if (prReviews.required_approving_review_count < 1) {
+                issues.push({
+                  severity: 'high',
+                  message: `Only ${prReviews.required_approving_review_count} approvals required (expected at least 1)`
+                });
+              }
+              
+              if (!prReviews.dismiss_stale_reviews) {
+                issues.push({
+                  severity: 'medium',
+                  message: 'Stale review dismissal is disabled'
+                });
+              }
+              
+              if (!prReviews.require_code_owner_reviews) {
+                issues.push({
+                  severity: 'high',
+                  message: 'CODEOWNERS reviews are not required'
+                });
+              }
+            }
+            
+            // Check status checks
+            if (!protection.data.required_status_checks) {
+              issues.push({
+                severity: 'critical',
+                message: 'Status checks are not required'
+              });
+            } else {
+              const statusChecks = protection.data.required_status_checks;
+              
+              if (!statusChecks.strict) {
+                issues.push({
+                  severity: 'medium',
+                  message: 'Branches are not required to be up to date before merging'
+                });
+              }
+              
+              const missingChecks = expectedRules.requiredStatusChecks.contexts.filter(
+                check => !statusChecks.contexts.includes(check)
+              );
+              
+              if (missingChecks.length > 0) {
+                issues.push({
+                  severity: 'high',
+                  message: `Missing required status checks: ${missingChecks.join(', ')}`
+                });
+              }
+            }
+            
+            // Check admin enforcement
+            if (!protection.data.enforce_admins || !protection.data.enforce_admins.enabled) {
+              issues.push({
+                severity: 'low',
+                message: 'Admin enforcement is disabled'
+              });
+            }
+            
+            // Check force push and deletion
+            if (protection.data.allow_force_pushes && protection.data.allow_force_pushes.enabled) {
+              issues.push({
+                severity: 'critical',
+                message: 'Force pushes are allowed'
+              });
+            }
+            
+            if (protection.data.allow_deletions && protection.data.allow_deletions.enabled) {
+              issues.push({
+                severity: 'critical',
+                message: 'Branch deletion is allowed'
+              });
+            }
+            
+            // Set outputs
+            core.setOutput('has-issues', issues.length > 0 ? 'true' : 'false');
+            core.setOutput('issues', JSON.stringify(issues));
+            core.setOutput('protection-summary', JSON.stringify({
+              branch: branch,
+              issueCount: issues.length,
+              criticalCount: issues.filter(i => i.severity === 'critical').length,
+              highCount: issues.filter(i => i.severity === 'high').length,
+              mediumCount: issues.filter(i => i.severity === 'medium').length,
+              lowCount: issues.filter(i => i.severity === 'low').length
+            }));
+
+      - name: Generate audit report
+        if: steps.check-protection.outputs.has-issues == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issues = JSON.parse('${{ steps.check-protection.outputs.issues }}');
+            const summary = JSON.parse('${{ steps.check-protection.outputs.protection-summary }}');
+            const notify = '${{ github.event.inputs.notify }}' !== 'false';
+            
+            // Group issues by severity
+            const grouped = {
+              critical: issues.filter(i => i.severity === 'critical'),
+              high: issues.filter(i => i.severity === 'high'),
+              medium: issues.filter(i => i.severity === 'medium'),
+              low: issues.filter(i => i.severity === 'low')
+            };
+            
+            // Create issue body
+            let body = `## 🛡️ Branch Protection Audit Report
+            
+            An automated audit of the branch protection rules for the \`${summary.branch}\` branch has identified the following issues:
+            
+            ### Summary
+            - **Total Issues**: ${summary.issueCount}
+            - **Critical**: ${summary.criticalCount}
+            - **High**: ${summary.highCount}
+            - **Medium**: ${summary.mediumCount}
+            - **Low**: ${summary.lowCount}
+            
+            ### Issues Found
+            `;
+            
+            for (const [severity, severityIssues] of Object.entries(grouped)) {
+              if (severityIssues.length > 0) {
+                const emoji = {
+                  critical: '🔴',
+                  high: '🟠',
+                  medium: '🟡',
+                  low: '🔵'
+                }[severity];
+                
+                body += `\n#### ${emoji} ${severity.charAt(0).toUpperCase() + severity.slice(1)} Priority\n\n`;
+                for (const issue of severityIssues) {
+                  body += `- ${issue.message}\n`;
+                }
+              }
+            }
+            
+            body += `
+            ### Recommended Actions
+            
+            1. Review the branch protection settings at [Settings → Branches](https://github.com/${context.repo.owner}/${context.repo.repo}/settings/branches)
+            2. Run the setup script: \`bash .github/scripts/setup-branch-protection.sh\`
+            3. Refer to the [Branch Protection Documentation](.github/BRANCH_PROTECTION.md) for detailed setup instructions
+            
+            ### Audit Details
+            - **Audit Date**: ${new Date().toISOString()}
+            - **Triggered By**: ${context.eventName === 'schedule' ? 'Scheduled audit' : 'Manual trigger'}
+            - **Workflow Run**: [#${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            
+            ---
+            
+            <sub>This issue was automatically generated by the Branch Protection Audit workflow.</sub>`;
+            
+            if (notify) {
+              // Check for existing open audit issues
+              const existingIssues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: 'branch-protection-audit',
+                state: 'open'
+              });
+              
+              if (existingIssues.data.length > 0) {
+                // Update the existing issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssues.data[0].number,
+                  body: body
+                });
+                
+                // Add a comment
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssues.data[0].number,
+                  body: `🔄 Updated with latest audit results from workflow run [#${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+                });
+                
+                console.log(`Updated existing issue #${existingIssues.data[0].number}`);
+              } else {
+                // Create a new issue
+                const issue = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: '🛡️ Branch Protection Audit - Issues Found',
+                  body: body,
+                  labels: ['branch-protection-audit', 'security', 'maintenance'],
+                  assignees: [] // Add specific users if needed
+                });
+                
+                console.log(`Created new issue #${issue.data.number}`);
+              }
+            } else {
+              console.log('Notification skipped (notify=false)');
+              console.log('Audit Report:');
+              console.log(body);
+            }
+
+      - name: Success notification
+        if: steps.check-protection.outputs.has-issues == 'false'
+        run: |
+          echo "✅ Branch protection audit passed!"
+          echo "All required protection rules are properly configured."
+
+      - name: Close stale audit issues
+        if: steps.check-protection.outputs.has-issues == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Close any open audit issues since all checks pass
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'branch-protection-audit',
+              state: 'open'
+            });
+            
+            for (const issue of issues.data) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed'
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `✅ All branch protection checks now pass! Closing this issue.\n\nAudit run: [#${context.runNumber}](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              });
+              
+              console.log(`Closed issue #${issue.number}`);
+            }

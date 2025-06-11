@@ -70,7 +70,7 @@
 
 # ============================================
 # OWNERSHIP EXCEPTIONS
-# ============================================ß
+# ============================================
 # Use negative patterns if needed to exclude specific files
 # Example: !**/test-*.ts would exclude test files
 

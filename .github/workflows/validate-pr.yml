@@ -49,6 +49,19 @@ jobs:
           # Check if commits follow conventional format
           invalid_commits=""
           while IFS= read -r commit; do
+            # Skip merge commits
+            if echo "$commit" | grep -qE "^Merge .+ into .+"; then
+              echo "ℹ️  Skipping merge commit: $commit"
+              continue
+            fi
+            
+            # Skip GitHub's default merge commits
+            if echo "$commit" | grep -qE "^Merge pull request #[0-9]+ from .+"; then
+              echo "ℹ️  Skipping GitHub merge commit: $commit"
+              continue
+            fi
+            
+            # Check conventional format
             if ! echo "$commit" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"; then
               invalid_commits="${invalid_commits}\n  - ${commit}"
             fi
