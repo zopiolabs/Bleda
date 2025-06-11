@@ -17,18 +17,18 @@ This document outlines the branch protection rules for the main branch and provi
 
 The following GitHub Actions workflows must pass before merging:
 
-### From `validate-pr.yml`:
-- `quick-checks` - PR title and commit message validation
-- `code-quality` - TypeScript type checking and security audit
-- `build-matrix (18.x)` - Build verification on Node 18
-- `build-matrix (20.x)` - Build verification on Node 20
-- `build-matrix (22.x)` - Build verification on Node 22
-- `performance` - Bundle size comparison
-- `pr-status-report` - Overall PR validation summary
+### From `validate-pr.yml` (Workflow: "Validate PR"):
+- `Validate PR / quick-checks` - PR title and commit message validation
+- `Validate PR / code-quality` - TypeScript type checking and security audit
+- `Validate PR / build-matrix (18.x)` - Build verification on Node 18
+- `Validate PR / build-matrix (20.x)` - Build verification on Node 20
+- `Validate PR / build-matrix (22.x)` - Build verification on Node 22
+- `Validate PR / performance` - Bundle size comparison
+- `Validate PR / pr-status-report` - Overall PR validation summary
 
-### From `build.yml`:
-- `build (18.x)` - Build and test on Node 18
-- `build (20.x)` - Build and test on Node 20
+### From `build.yml` (Workflow: "Build and Test"):
+- `Build and Test / build (18.x)` - Build and test on Node 18
+- `Build and Test / build (20.x)` - Build and test on Node 20
 
 ## Setting Up Branch Protection
 
@@ -49,15 +49,15 @@ The following GitHub Actions workflows must pass before merging:
 - [x] Require status checks to pass before merging
   - [x] Require branches to be up to date before merging
   - Required status checks:
-    - `quick-checks`
-    - `code-quality`
-    - `build-matrix (18.x)`
-    - `build-matrix (20.x)`
-    - `build-matrix (22.x)`
-    - `performance`
-    - `pr-status-report`
-    - `build (18.x)`
-    - `build (20.x)`
+    - `Validate PR / quick-checks`
+    - `Validate PR / code-quality`
+    - `Validate PR / build-matrix (18.x)`
+    - `Validate PR / build-matrix (20.x)`
+    - `Validate PR / build-matrix (22.x)`
+    - `Validate PR / performance`
+    - `Validate PR / pr-status-report`
+    - `Build and Test / build (18.x)`
+    - `Build and Test / build (20.x)`
 
 #### Push Restrictions
 - [x] Restrict who can push to matching branches
