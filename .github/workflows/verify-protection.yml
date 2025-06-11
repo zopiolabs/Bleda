@@ -1,0 +1,252 @@
+name: Verify Protection Setup
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/CODEOWNERS'
+      - '.github/BRANCH_PROTECTION.md'
+      - '.github/workflows/*.yml'
+      - '.github/scripts/setup-branch-protection.sh'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify-codeowners:
+    name: Verify CODEOWNERS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate CODEOWNERS syntax
+        run: |
+          # Check if CODEOWNERS file exists
+          if [ ! -f .github/CODEOWNERS ]; then
+            echo "❌ CODEOWNERS file not found"
+            exit 1
+          fi
+          
+          # Basic syntax validation
+          errors=0
+          line_num=0
+          
+          while IFS= read -r line; do
+            ((line_num++))
+            
+            # Skip empty lines and comments
+            if [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]]; then
+              continue
+            fi
+            
+            # Check for valid pattern (should start with / or * or **)
+            if ! [[ "$line" =~ ^[[:space:]]*[\*/] ]]; then
+              echo "❌ Line $line_num: Invalid pattern - should start with /, *, or **"
+              ((errors++))
+            fi
+            
+            # Check for team/user mentions (should contain @)
+            if ! [[ "$line" =~ @ ]]; then
+              echo "❌ Line $line_num: No owner specified - should contain @username or @org/team"
+              ((errors++))
+            fi
+          done < .github/CODEOWNERS
+          
+          if [ $errors -eq 0 ]; then
+            echo "✅ CODEOWNERS syntax validation passed"
+          else
+            echo "Found $errors syntax errors"
+            exit 1
+          fi
+
+      - name: Check CODEOWNERS coverage
+        run: |
+          # List of critical files that should have owners
+          critical_files=(
+            "package.json"
+            "tsconfig.json"
+            ".github/workflows/"
+            "src/main.ts"
+          )
+          
+          missing=0
+          for file in "${critical_files[@]}"; do
+            if ! grep -q "^[[:space:]]*/*$file" .github/CODEOWNERS; then
+              echo "⚠️  No owner specified for: $file"
+              ((missing++))
+            fi
+          done
+          
+          if [ $missing -eq 0 ]; then
+            echo "✅ All critical files have owners assigned"
+          else
+            echo "⚠️  $missing critical files lack owner assignments"
+          fi
+
+  verify-workflows:
+    name: Verify Workflow Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required workflows exist
+        run: |
+          required_workflows=(
+            "build.yml"
+            "validate-pr.yml"
+            "audit-protection.yml"
+          )
+          
+          missing=0
+          for workflow in "${required_workflows[@]}"; do
+            if [ ! -f ".github/workflows/$workflow" ]; then
+              echo "❌ Required workflow missing: $workflow"
+              ((missing++))
+            else
+              echo "✅ Found: $workflow"
+            fi
+          done
+          
+          if [ $missing -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Verify workflow triggers
+        run: |
+          # Check that validate-pr.yml runs on pull_request
+          if ! grep -q "pull_request:" .github/workflows/validate-pr.yml; then
+            echo "❌ validate-pr.yml must run on pull_request events"
+            exit 1
+          fi
+          
+          # Check that build.yml runs on both push and pull_request
+          if ! grep -q "push:" .github/workflows/build.yml || ! grep -q "pull_request:" .github/workflows/build.yml; then
+            echo "❌ build.yml must run on both push and pull_request events"
+            exit 1
+          fi
+          
+          echo "✅ Workflow triggers configured correctly"
+
+  verify-status-checks:
+    name: Verify Status Check Names
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract job names from workflows
+        id: extract-jobs
+        run: |
+          # Extract job names that should be status checks
+          echo "## Status checks found in workflows:"
+          
+          # From validate-pr.yml
+          echo "### validate-pr.yml:"
+          grep -E "^[[:space:]]{2}[a-zA-Z0-9_-]+:" .github/workflows/validate-pr.yml | sed 's/://g' | awk '{print $1}' | grep -v "permissions\|on\|env" | while read job; do
+            echo "  - $job"
+          done
+          
+          # From build.yml
+          echo "### build.yml:"
+          grep -E "^[[:space:]]{2}[a-zA-Z0-9_-]+:" .github/workflows/build.yml | sed 's/://g' | awk '{print $1}' | grep -v "permissions\|on\|env" | while read job; do
+            echo "  - $job"
+          done
+
+      - name: Compare with documented checks
+        run: |
+          # Expected status checks from BRANCH_PROTECTION.md
+          expected_checks=(
+            "quick-checks"
+            "code-quality"
+            "build-matrix"
+            "performance"
+            "pr-status-report"
+            "build"
+          )
+          
+          echo "## Verifying documented status checks exist in workflows"
+          
+          for check in "${expected_checks[@]}"; do
+            found=false
+            
+            for workflow in .github/workflows/*.yml; do
+              if grep -q "^[[:space:]]*${check}:" "$workflow" 2>/dev/null; then
+                echo "✅ Found job: $check in $(basename $workflow)"
+                found=true
+                break
+              fi
+            done
+            
+            if [ "$found" = false ]; then
+              echo "⚠️  Job not found in any workflow: $check"
+            fi
+          done
+
+  protection-summary:
+    name: Protection Configuration Summary
+    runs-on: ubuntu-latest
+    needs: [verify-codeowners, verify-workflows, verify-status-checks]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = {
+              'verify-codeowners': '${{ needs.verify-codeowners.result }}',
+              'verify-workflows': '${{ needs.verify-workflows.result }}',
+              'verify-status-checks': '${{ needs.verify-status-checks.result }}'
+            };
+            
+            let summary = '## 🛡️ Protection Configuration Verification\n\n';
+            summary += '| Component | Status |\n';
+            summary += '|-----------|--------|\n';
+            
+            let allPassed = true;
+            for (const [job, status] of Object.entries(jobs)) {
+              const emoji = status === 'success' ? '✅' : '❌';
+              const jobName = job.split('-').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+              ).join(' ');
+              summary += `| ${jobName} | ${emoji} ${status} |\n`;
+              if (status !== 'success') allPassed = false;
+            }
+            
+            summary += '\n';
+            
+            if (allPassed) {
+              summary += '### ✅ All protection configurations are valid!\n\n';
+              summary += 'The repository is properly configured for branch protection.\n';
+            } else {
+              summary += '### ⚠️ Some configurations need attention\n\n';
+              summary += 'Please review the failed checks above and update the configurations.\n';
+            }
+            
+            summary += '\n#### Next Steps:\n';
+            summary += '1. Run `.github/scripts/setup-branch-protection.sh` to apply protection rules\n';
+            summary += '2. Verify settings at [Branch Settings](../../settings/branches)\n';
+            summary += '3. Review [Branch Protection Documentation](../../blob/main/.github/BRANCH_PROTECTION.md)\n';
+            
+            // Output to job summary
+            await core.summary
+              .addRaw(summary)
+              .write();
+            
+            // Add PR comment if this is a pull request
+            if (context.eventName === 'pull_request') {
+              const comment = summary + '\n\n<sub>Generated by Protection Verification workflow</sub>';
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
