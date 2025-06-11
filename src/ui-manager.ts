@@ -1,4 +1,4 @@
-import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG } from './constants';
+import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, ObstacleType } from './constants';
 import { ROAST_MESSAGES, L33T_MESSAGES } from './messages';
 
 export class UIManager {
@@ -134,6 +134,28 @@ export class UIManager {
           ];
           return { at: `${i * 10}%`, style: `transform: translate(${positions[i]});` };
         })
+      },
+      {
+        name: 'stunPulse',
+        frames: [
+          { at: '0%, 100%', style: 'background: radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.3) 100%);' },
+          { at: '50%', style: 'background: radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.5) 100%);' }
+        ]
+      },
+      {
+        name: 'warningFlash',
+        frames: [
+          { at: '0%, 100%', style: 'opacity: 1; transform: translateX(-50%) scale(1);' },
+          { at: '50%', style: 'opacity: 0.3; transform: translateX(-50%) scale(0.95);' }
+        ]
+      },
+      {
+        name: 'collisionShake',
+        frames: [
+          { at: '0%, 100%', style: 'transform: translateX(-50%) rotate(0deg);' },
+          { at: '25%', style: 'transform: translateX(-48%) rotate(-2deg);' },
+          { at: '75%', style: 'transform: translateX(-52%) rotate(2deg);' }
+        ]
       }
     ],
     rules: [
@@ -624,5 +646,169 @@ export class UIManager {
         `;
       }).join('')}
     `;
+  }
+  
+  public showStunEffect(): void {
+    // Create or get stun overlay
+    let stunOverlay = document.getElementById('stun-overlay');
+    if (!stunOverlay) {
+      stunOverlay = this.createUIContainer({
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        background: 'radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.3) 100%)',
+        pointerEvents: 'none',
+        zIndex: '999',
+        display: 'none'
+      }, 'stun-overlay');
+      
+      // Add animated stars/dizzy effect
+      const starsHTML = Array.from({ length: 5 }, (_, i) => `
+        <div style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 30px;
+          height: 30px;
+          font-size: 30px;
+          transform: translate(-50%, -50%) rotate(${i * 72}deg) translateY(-100px);
+          animation: dizzyStars 2s linear infinite;
+        ">⭐</div>
+      `).join('');
+      
+      stunOverlay.innerHTML = `
+        <div style="
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          font-size: 72px;
+          color: #ff0000;
+          text-shadow: 0 0 20px #ff0000;
+          animation: pulse 0.5s ease-in-out infinite;
+        ">💫</div>
+        ${starsHTML}
+        <style>
+          @keyframes dizzyStars {
+            0% { transform: translate(-50%, -50%) rotate(0deg) translateY(-100px); }
+            100% { transform: translate(-50%, -50%) rotate(360deg) translateY(-100px); }
+          }
+        </style>
+      `;
+      
+      document.body.appendChild(stunOverlay);
+    }
+    
+    stunOverlay.style.display = 'block';
+    stunOverlay.style.animation = 'stunPulse 0.5s ease-in-out infinite';
+  }
+  
+  public hideStunEffect(): void {
+    const stunOverlay = document.getElementById('stun-overlay');
+    if (stunOverlay) {
+      stunOverlay.style.display = 'none';
+    }
+  }
+  
+  public showObstacleWarning(message: string, _type: ObstacleType): void {
+    // Create or get warning display
+    let warningDisplay = document.getElementById('obstacle-warning');
+    if (!warningDisplay) {
+      warningDisplay = this.createUIContainer({
+        top: '60%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '28px',
+        fontWeight: 'bold',
+        color: '#FF0000',
+        textShadow: '0 0 20px #FF0000, 0 0 40px #FF0000',
+        letterSpacing: '4px',
+        textAlign: 'center',
+        zIndex: '1000',
+        opacity: '0',
+        transition: 'all 0.2s ease-out',
+        pointerEvents: 'none',
+        textTransform: 'uppercase'
+      }, 'obstacle-warning');
+      document.body.appendChild(warningDisplay);
+    }
+    
+    warningDisplay.textContent = message;
+    warningDisplay.style.animation = 'warningFlash 0.5s ease-in-out infinite';
+    
+    // Show warning
+    warningDisplay.style.opacity = '0';
+    warningDisplay.style.transform = 'translateX(-50%) scale(0.8)';
+    
+    // Force reflow
+    warningDisplay.offsetHeight;
+    
+    warningDisplay.style.opacity = '1';
+    warningDisplay.style.transform = 'translateX(-50%) scale(1)';
+    
+    // Hide after short duration
+    setTimeout(() => {
+      warningDisplay.style.opacity = '0';
+      warningDisplay.style.transform = 'translateX(-50%) scale(1.2)';
+      warningDisplay.style.animation = '';
+    }, 1500);
+  }
+  
+  public showObstacleCollision(message: string, _type: ObstacleType): void {
+    // Create or get collision message display
+    let collisionDisplay = document.getElementById('obstacle-collision');
+    if (!collisionDisplay) {
+      collisionDisplay = this.createUIContainer({
+        top: '40%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '36px',
+        fontWeight: 'bold',
+        color: '#FF0000',
+        textShadow: '0 0 30px #FF0000, 0 0 60px #FF0000',
+        letterSpacing: '6px',
+        textAlign: 'center',
+        zIndex: '1001',
+        opacity: '0',
+        transition: 'all 0.3s ease-out',
+        pointerEvents: 'none',
+        textTransform: 'uppercase',
+        background: 'rgba(0,0,0,0.8)',
+        padding: '20px 40px',
+        border: '3px solid #FF0000',
+        borderRadius: '10px'
+      }, 'obstacle-collision');
+      document.body.appendChild(collisionDisplay);
+    }
+    
+    collisionDisplay.textContent = message;
+    
+    // Animate in with impact effect
+    collisionDisplay.style.opacity = '0';
+    collisionDisplay.style.transform = 'translateX(-50%) scale(2)';
+    
+    // Force reflow
+    collisionDisplay.offsetHeight;
+    
+    collisionDisplay.style.opacity = '1';
+    collisionDisplay.style.transform = 'translateX(-50%) scale(1)';
+    collisionDisplay.style.animation = 'collisionShake 0.3s ease-in-out';
+    
+    // Flash red border on game container
+    const gameContainer = document.getElementById('game-container');
+    if (gameContainer) {
+      gameContainer.style.boxShadow = 'inset 0 0 100px rgba(255,0,0,0.5)';
+      setTimeout(() => {
+        gameContainer.style.boxShadow = '';
+      }, 500);
+    }
+    
+    // Hide after duration
+    setTimeout(() => {
+      collisionDisplay.style.opacity = '0';
+      collisionDisplay.style.transform = 'translateX(-50%) scale(0.8)';
+      collisionDisplay.style.animation = '';
+    }, 2000);
   }
 }

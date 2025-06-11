@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { COLORS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, POWERUP_MESSAGES } from './constants';
+import { COLORS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, POWERUP_MESSAGES, ObstacleType, OBSTACLE_CONFIG, OBSTACLE_MESSAGES } from './constants';
 import { UIManager } from './ui-manager';
 import { PowerUp, PowerUpEffect } from './powerup';
+import { Obstacle, FlyingRock, Tree, Bird } from './obstacle';
 
 interface Arrow {
   mesh: THREE.Group | THREE.Mesh;
@@ -46,6 +47,12 @@ export class Game {
   private arrowCooldown = 500; // Default cooldown in ms
   private lastArrowShot = 0;
   private scoreMultiplier = 1;
+  
+  // Obstacles
+  private obstacles: Obstacle[] = [];
+  private lastObstacleSpawn = 0;
+  private isStunned = false;
+  private stunnedUntil = 0;
   
   // Controls
   private keys = {
@@ -753,11 +760,13 @@ export class Game {
     
     const deltaTime = this.clock.getDelta();
     
-    // Update Bleda movement
+    // Update Bleda movement (affected by stun)
+    const movementMultiplier = this.isStunned ? OBSTACLE_CONFIG.STUN_MOVEMENT_MULTIPLIER : 1;
+    
     if (this.keys.left) {
-      this.bledaVelocity.x = -GAME_CONFIG.BLEDA_SPEED;
+      this.bledaVelocity.x = -GAME_CONFIG.BLEDA_SPEED * movementMultiplier;
     } else if (this.keys.right) {
-      this.bledaVelocity.x = GAME_CONFIG.BLEDA_SPEED;
+      this.bledaVelocity.x = GAME_CONFIG.BLEDA_SPEED * movementMultiplier;
     } else {
       this.bledaVelocity.x *= 0.8; // Friction
     }
@@ -828,6 +837,9 @@ export class Game {
     // Update power-ups
     this.updatePowerUps(deltaTime);
     
+    // Update obstacles
+    this.updateObstacles(deltaTime);
+    
     // Update active power-ups display
     const currentTime = Date.now();
     const activePowerUpsDisplay = this.activePowerUps.map(effect => ({
@@ -861,6 +873,12 @@ export class Game {
     
     // Dispose power-ups
     this.powerUps.forEach(powerUp => powerUp.dispose());
+    
+    // Dispose obstacles
+    this.obstacles.forEach(obstacle => {
+      this.scene.remove(obstacle.mesh);
+      obstacle.dispose();
+    });
   }
   
   private hasActivePowerUp(type: PowerUpType): boolean {
@@ -966,6 +984,177 @@ export class Game {
       this.spawnPowerUp();
       this.lastPowerUpSpawn = currentTime;
     }
+  }
+  
+  private spawnObstacle(): void {
+    if (this.obstacles.filter(o => o.isActive).length >= OBSTACLE_CONFIG.MAX_ACTIVE_OBSTACLES) {
+      return;
+    }
+    
+    // Random chance to spawn
+    if (Math.random() > OBSTACLE_CONFIG.SPAWN_CHANCE) {
+      return;
+    }
+    
+    // Choose random obstacle type
+    const types = Object.values(ObstacleType);
+    const randomType = types[Math.floor(Math.random() * types.length)];
+    
+    let obstacle: Obstacle | null = null;
+    
+    switch (randomType) {
+      case ObstacleType.FLYING_ROCK:
+        // Spawn rock from a random direction aimed at player area
+        const angle = Math.random() * Math.PI * 2;
+        const distance = OBSTACLE_CONFIG.MIN_SPAWN_DISTANCE + 
+          Math.random() * (OBSTACLE_CONFIG.MAX_SPAWN_DISTANCE - OBSTACLE_CONFIG.MIN_SPAWN_DISTANCE);
+        const height = OBSTACLE_CONFIG.FLYING_ROCK.SPAWN_HEIGHT_MIN + 
+          Math.random() * (OBSTACLE_CONFIG.FLYING_ROCK.SPAWN_HEIGHT_MAX - OBSTACLE_CONFIG.FLYING_ROCK.SPAWN_HEIGHT_MIN);
+        
+        const rockPosition = new THREE.Vector3(
+          Math.cos(angle) * distance,
+          height,
+          Math.sin(angle) * distance
+        );
+        
+        // Aim towards player area with some variance
+        const targetDirection = new THREE.Vector3(
+          this.bledaPosition.x - rockPosition.x,
+          0,
+          this.bledaPosition.z - rockPosition.z
+        );
+        
+        obstacle = new FlyingRock(rockPosition, targetDirection);
+        break;
+        
+      case ObstacleType.TREE:
+        // Place tree at random position on ground
+        const treeAngle = Math.random() * Math.PI * 2;
+        const treeDistance = 5 + Math.random() * OBSTACLE_CONFIG.TREE.SPAWN_RADIUS;
+        const treePosition = new THREE.Vector3(
+          this.bledaPosition.x + Math.cos(treeAngle) * treeDistance,
+          0,
+          this.bledaPosition.z + Math.sin(treeAngle) * treeDistance
+        );
+        
+        obstacle = new Tree(treePosition);
+        break;
+        
+      case ObstacleType.BIRD:
+        // Spawn bird(s) from side of screen
+        const flockSize = OBSTACLE_CONFIG.BIRD.FLOCK_SIZE_MIN + 
+          Math.floor(Math.random() * (OBSTACLE_CONFIG.BIRD.FLOCK_SIZE_MAX - OBSTACLE_CONFIG.BIRD.FLOCK_SIZE_MIN + 1));
+        
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const birdHeight = 3 + Math.random() * 3;
+        
+        for (let i = 0; i < flockSize; i++) {
+          const birdPosition = new THREE.Vector3(
+            side * OBSTACLE_CONFIG.MAX_SPAWN_DISTANCE,
+            birdHeight + i * 0.5,
+            this.bledaPosition.z + (Math.random() - 0.5) * 10
+          );
+          
+          const birdDirection = new THREE.Vector3(-side, 0, 0);
+          const bird = new Bird(birdPosition, birdDirection);
+          
+          if (i === 0) {
+            obstacle = bird;
+          } else {
+            // Add additional birds directly to scene
+            this.obstacles.push(bird);
+            this.scene.add(bird.mesh);
+          }
+        }
+        break;
+    }
+    
+    if (obstacle) {
+      this.obstacles.push(obstacle);
+      this.scene.add(obstacle.mesh);
+    }
+  }
+  
+  private updateObstacles(deltaTime: number): void {
+    const currentTime = Date.now();
+    
+    // Update stun status
+    if (this.isStunned && currentTime >= this.stunnedUntil) {
+      this.isStunned = false;
+      this.uiManager.hideStunEffect();
+    }
+    
+    // Update obstacles
+    this.obstacles.forEach(obstacle => {
+      if (obstacle.isActive) {
+        obstacle.update(deltaTime, this.bleda.position);
+        
+        // Check for collision with player
+        if (obstacle.checkCollision(this.bleda.position)) {
+          this.handleObstacleCollision(obstacle);
+        }
+        
+        // Check if obstacle is approaching for warning
+        const warningDistance = obstacle.getWarningDistance(this.bleda.position);
+        if (warningDistance < OBSTACLE_CONFIG.WARNING_DISTANCE && warningDistance > OBSTACLE_CONFIG.COLLISION_RADIUS) {
+          // Show warning (implement in UI manager)
+          if (obstacle.type === ObstacleType.FLYING_ROCK || obstacle.type === ObstacleType.BIRD) {
+            this.uiManager.showObstacleWarning(OBSTACLE_MESSAGES.WARNING[obstacle.type], obstacle.type);
+          }
+        }
+      }
+    });
+    
+    // Remove inactive obstacles
+    this.obstacles = this.obstacles.filter(obstacle => {
+      if (!obstacle.isActive) {
+        this.scene.remove(obstacle.mesh);
+        obstacle.dispose();
+        return false;
+      }
+      return true;
+    });
+    
+    // Check if it's time to spawn new obstacles
+    if (currentTime - this.lastObstacleSpawn >= OBSTACLE_CONFIG.SPAWN_INTERVAL) {
+      this.spawnObstacle();
+      this.lastObstacleSpawn = currentTime;
+    }
+  }
+  
+  private handleObstacleCollision(obstacle: Obstacle): void {
+    // Deactivate obstacle
+    obstacle.deactivate();
+    
+    // Apply stun effect
+    this.isStunned = true;
+    this.stunnedUntil = Date.now() + OBSTACLE_CONFIG.STUN_DURATION;
+    
+    // Apply score penalty
+    this.score = Math.max(0, this.score - OBSTACLE_CONFIG.SCORE_PENALTY);
+    this.uiManager.updateScore(this.score);
+    
+    // Show collision message
+    this.uiManager.showObstacleCollision(OBSTACLE_MESSAGES.COLLISION[obstacle.type], obstacle.type);
+    
+    // Visual stun effect
+    this.uiManager.showStunEffect();
+    
+    // Camera shake effect
+    const originalCameraPosition = this.camera.position.clone();
+    let shakeTime = 0;
+    const shakeAnimation = () => {
+      shakeTime += 16; // ~60fps
+      if (shakeTime < 300) {
+        const intensity = (1 - shakeTime / 300) * 0.5;
+        this.camera.position.x = originalCameraPosition.x + (Math.random() - 0.5) * intensity;
+        this.camera.position.y = originalCameraPosition.y + (Math.random() - 0.5) * intensity;
+        requestAnimationFrame(shakeAnimation);
+      } else {
+        this.camera.position.copy(originalCameraPosition);
+      }
+    };
+    shakeAnimation();
   }
   
   private createExplosionEffect(position: THREE.Vector3): void {

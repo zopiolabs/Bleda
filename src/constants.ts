@@ -128,3 +128,77 @@ export const POWERUP_MESSAGES = {
     [PowerUpType.SCORE_MULTIPLIER]: '|| SC0R3 B00ST 3ND3D ||'
   }
 } as const;
+
+export enum ObstacleType {
+  FLYING_ROCK = 'FLYING_ROCK',
+  TREE = 'TREE',
+  BIRD = 'BIRD'
+}
+
+export const OBSTACLE_CONFIG = {
+  // Spawn configuration
+  SPAWN_INTERVAL: 8000, // 8 seconds between obstacle waves
+  SPAWN_CHANCE: 0.6, // 60% chance to spawn when interval is reached
+  MAX_ACTIVE_OBSTACLES: 5,
+  MIN_SPAWN_DISTANCE: 25, // Minimum distance from Bleda for spawning
+  MAX_SPAWN_DISTANCE: 40,
+  
+  // General obstacle properties
+  COLLISION_RADIUS: 1.5,
+  WARNING_DISTANCE: 15, // Distance at which to show warning indicator
+  
+  // Stun mechanics
+  STUN_DURATION: 2000, // 2 seconds stun
+  STUN_MOVEMENT_MULTIPLIER: 0.3, // 70% movement speed reduction
+  SCORE_PENALTY: 5,
+  
+  // Obstacle specific configurations
+  FLYING_ROCK: {
+    SIZE: 1.2,
+    SPEED: 15,
+    ROTATION_SPEED: 3,
+    COLOR: 0x666666,
+    SPAWN_HEIGHT_MIN: 2,
+    SPAWN_HEIGHT_MAX: 6,
+    TRAJECTORY_VARIANCE: 0.2, // Random variance in trajectory
+    ICON: '🪨',
+    NAME: 'FLYING ROCK'
+  },
+  
+  TREE: {
+    TRUNK_HEIGHT: 4,
+    TRUNK_RADIUS: 0.5,
+    FOLIAGE_RADIUS: 2,
+    COLOR_TRUNK: 0x654321,
+    COLOR_FOLIAGE: 0x228B22,
+    SPAWN_RADIUS: 20, // Spawns in a circle around player
+    ICON: '🌲',
+    NAME: 'TREE'
+  },
+  
+  BIRD: {
+    SIZE: 0.8,
+    SPEED: 12,
+    WAVE_AMPLITUDE: 2,
+    WAVE_FREQUENCY: 2,
+    COLOR_BODY: 0x2C1810,
+    COLOR_WING: 0x4A3C28,
+    FLOCK_SIZE_MIN: 1,
+    FLOCK_SIZE_MAX: 3,
+    ICON: '🦅',
+    NAME: 'BIRD'
+  }
+} as const;
+
+export const OBSTACLE_MESSAGES = {
+  COLLISION: {
+    [ObstacleType.FLYING_ROCK]: '|| R0CK H1T! STUNN3D ||',
+    [ObstacleType.TREE]: '|| TR33 CR4SH! 0UCH ||',
+    [ObstacleType.BIRD]: '|| B1RD STR1K3! ||'
+  },
+  WARNING: {
+    [ObstacleType.FLYING_ROCK]: '|| 1NC0M1NG R0CK! ||',
+    [ObstacleType.TREE]: '|| W4TCH 0UT! TR33 4H34D ||',
+    [ObstacleType.BIRD]: '|| B1RDS 4PPR04CH1NG! ||'
+  }
+} as const;
