@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import { COLORS, GAME_CONFIG } from './constants';
+import { COLORS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG, POWERUP_MESSAGES } from './constants';
 import { UIManager } from './ui-manager';
+import { PowerUp, PowerUpEffect } from './powerup';
 
 interface Arrow {
   mesh: THREE.Group | THREE.Mesh;
   velocity: THREE.Vector3;
   active: boolean;
+  isExplosive?: boolean;
 }
 
 export class Game {
@@ -36,6 +38,14 @@ export class Game {
   
   // UI Manager
   private uiManager: UIManager;
+  
+  // Power-ups
+  private powerUps: PowerUp[] = [];
+  private activePowerUps: PowerUpEffect[] = [];
+  private lastPowerUpSpawn = 0;
+  private arrowCooldown = 500; // Default cooldown in ms
+  private lastArrowShot = 0;
+  private scoreMultiplier = 1;
   
   // Controls
   private keys = {
@@ -515,6 +525,7 @@ export class Game {
         castShadow: true
       }
     );
+    head.userData.isHead = true;
     
     // Arrow fletching (feathers) - create three arranged in circle
     const fletchingGeometry = this.createGeometry('box', 0.1, 0.08, 0.01);
@@ -553,6 +564,17 @@ export class Game {
   }
   
   private shoot(): void {
+    // Check cooldown
+    const currentTime = Date.now();
+    const actualCooldown = this.hasActivePowerUp(PowerUpType.RAPID_FIRE) 
+      ? this.arrowCooldown * POWERUP_CONFIG.RAPID_FIRE.ARROW_COOLDOWN_MULTIPLIER
+      : this.arrowCooldown;
+      
+    if (currentTime - this.lastArrowShot < actualCooldown) {
+      return;
+    }
+    this.lastArrowShot = currentTime;
+    
     // Increment shots fired
     this.uiManager.incrementShotsFired();
     
@@ -562,6 +584,19 @@ export class Game {
       arrow = this.createArrow();
       this.arrows.push(arrow);
       this.scene.add(arrow.mesh);
+    }
+    
+    // Check if explosive arrows are active
+    arrow.isExplosive = this.hasActivePowerUp(PowerUpType.EXPLOSIVE_ARROWS);
+    
+    // Make explosive arrows glow
+    if (arrow.isExplosive && arrow.mesh instanceof THREE.Group) {
+      const arrowHead = arrow.mesh.children.find(child => child.userData.isHead);
+      if (arrowHead && arrowHead instanceof THREE.Mesh) {
+        const material = arrowHead.material as THREE.MeshLambertMaterial;
+        material.emissive = new THREE.Color(0xFF4500);
+        material.emissiveIntensity = 0.5;
+      }
     }
     
     // Position arrow at bow location
@@ -599,25 +634,50 @@ export class Game {
     this.arrows.forEach(arrow => {
       if (!arrow.active) return;
       
+      // Check collision with ball
       const distance = arrow.mesh.position.distanceTo(ballWorldPos);
-      if (distance < 1.0) { // Smaller hit radius for smaller ball
+      const hitRadius = arrow.isExplosive ? POWERUP_CONFIG.EXPLOSIVE_ARROWS.EXPLOSION_RADIUS : 1.0;
+      
+      if (distance < hitRadius) {
         // Hit!
         arrow.active = false;
         arrow.mesh.position.y = -100; // Hide arrow
         
-        this.score++;
+        // Calculate score with multiplier
+        const baseScore = arrow.isExplosive ? POWERUP_CONFIG.EXPLOSIVE_ARROWS.EXPLOSION_DAMAGE_MULTIPLIER : 1;
+        const scoreGain = baseScore * this.scoreMultiplier;
+        this.score += scoreGain;
+        
         this.wheelSpeed *= 1.2; // Increase wheel speed
         this.uiManager.updateScore(this.score);
         this.uiManager.incrementShotsHit(); // This also shows congrats message
         
+        // Create explosion effect for explosive arrows
+        if (arrow.isExplosive) {
+          this.createExplosionEffect(arrow.mesh.position.clone());
+        }
+        
         // Flash effect
         const ballMaterial = this.ball.material as THREE.MeshLambertMaterial;
         const originalColor = ballMaterial.color.getHex();
-        ballMaterial.color.setHex(0xFFFF00);
+        ballMaterial.color.setHex(arrow.isExplosive ? 0xFF4500 : 0xFFFF00);
         setTimeout(() => {
           ballMaterial.color.setHex(originalColor);
         }, 200);
       }
+      
+      // Check collision with power-ups
+      this.powerUps.forEach(powerUp => {
+        if (!powerUp.isActive || !arrow.active) return;
+        
+        const powerUpDistance = arrow.mesh.position.distanceTo(powerUp.mesh.position);
+        if (powerUpDistance < POWERUP_CONFIG.PICKUP_RADIUS) {
+          // Arrow hit power-up!
+          arrow.active = false;
+          arrow.mesh.position.y = -100; // Hide arrow
+          this.activatePowerUp(powerUp);
+        }
+      });
     });
   }
   
@@ -765,6 +825,17 @@ export class Game {
       }
     });
     
+    // Update power-ups
+    this.updatePowerUps(deltaTime);
+    
+    // Update active power-ups display
+    const currentTime = Date.now();
+    const activePowerUpsDisplay = this.activePowerUps.map(effect => ({
+      type: effect.type,
+      remaining: effect.duration - (currentTime - effect.startTime)
+    }));
+    this.uiManager.updateActivePowerUps(activePowerUpsDisplay);
+    
     // Check collisions
     this.checkCollisions();
     
@@ -787,5 +858,180 @@ export class Game {
         }
       }
     });
+    
+    // Dispose power-ups
+    this.powerUps.forEach(powerUp => powerUp.dispose());
+  }
+  
+  private hasActivePowerUp(type: PowerUpType): boolean {
+    return this.activePowerUps.some(effect => effect.type === type);
+  }
+  
+  private spawnPowerUp(): void {
+    if (this.powerUps.filter(p => p.isActive).length >= POWERUP_CONFIG.MAX_ACTIVE_POWERUPS) {
+      return;
+    }
+    
+    // Random chance to spawn
+    if (Math.random() > POWERUP_CONFIG.SPAWN_CHANCE) {
+      return;
+    }
+    
+    // Choose random power-up type
+    const types = Object.values(PowerUpType);
+    const randomType = types[Math.floor(Math.random() * types.length)];
+    
+    // Random position in front of Bleda
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * POWERUP_CONFIG.SPAWN_RADIUS + 5;
+    const position = new THREE.Vector3(
+      Math.cos(angle) * radius,
+      POWERUP_CONFIG.SPAWN_HEIGHT,
+      Math.sin(angle) * radius
+    );
+    
+    const powerUp = new PowerUp(randomType, position);
+    this.powerUps.push(powerUp);
+    this.scene.add(powerUp.mesh);
+  }
+  
+  private activatePowerUp(powerUp: PowerUp): void {
+    const effect: PowerUpEffect = {
+      type: powerUp.type,
+      startTime: Date.now(),
+      duration: this.getPowerUpDuration(powerUp.type)
+    };
+    
+    this.activePowerUps.push(effect);
+    powerUp.deactivate();
+    
+    // Apply immediate effects
+    switch (powerUp.type) {
+      case PowerUpType.SCORE_MULTIPLIER:
+        this.scoreMultiplier = POWERUP_CONFIG.SCORE_MULTIPLIER.MULTIPLIER;
+        break;
+    }
+    
+    // Show pickup message
+    this.uiManager.showPowerUpMessage(POWERUP_MESSAGES.PICKUP[powerUp.type], powerUp.type);
+  }
+  
+  private getPowerUpDuration(type: PowerUpType): number {
+    switch (type) {
+      case PowerUpType.RAPID_FIRE:
+        return POWERUP_CONFIG.RAPID_FIRE.DURATION;
+      case PowerUpType.EXPLOSIVE_ARROWS:
+        return POWERUP_CONFIG.EXPLOSIVE_ARROWS.DURATION;
+      case PowerUpType.SCORE_MULTIPLIER:
+        return POWERUP_CONFIG.SCORE_MULTIPLIER.DURATION;
+    }
+  }
+  
+  private updatePowerUps(deltaTime: number): void {
+    const currentTime = Date.now();
+    const elapsedTime = currentTime / 1000;
+    
+    // Update power-up animations
+    this.powerUps.forEach(powerUp => {
+      if (powerUp.isActive) {
+        powerUp.update(deltaTime, elapsedTime);
+        
+        // Check collision with Bleda
+        if (powerUp.checkCollision(this.bleda.position)) {
+          this.activatePowerUp(powerUp);
+        }
+      }
+    });
+    
+    // Check for expired power-ups
+    this.activePowerUps = this.activePowerUps.filter(effect => {
+      const elapsed = currentTime - effect.startTime;
+      if (elapsed >= effect.duration) {
+        // Remove expired effects
+        switch (effect.type) {
+          case PowerUpType.SCORE_MULTIPLIER:
+            this.scoreMultiplier = 1;
+            break;
+        }
+        
+        // Show expiration message
+        this.uiManager.showPowerUpMessage(POWERUP_MESSAGES.EXPIRE[effect.type], effect.type);
+        return false;
+      }
+      return true;
+    });
+    
+    // Check if it's time to spawn a new power-up
+    if (currentTime - this.lastPowerUpSpawn >= POWERUP_CONFIG.SPAWN_INTERVAL) {
+      this.spawnPowerUp();
+      this.lastPowerUpSpawn = currentTime;
+    }
+  }
+  
+  private createExplosionEffect(position: THREE.Vector3): void {
+    // Create explosion particles
+    const particleCount = 20;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] = position.x + (Math.random() - 0.5) * 2;
+      positions[i3 + 1] = position.y + (Math.random() - 0.5) * 2;
+      positions[i3 + 2] = position.z + (Math.random() - 0.5) * 2;
+      
+      // Orange to red colors
+      colors[i3] = 1;
+      colors[i3 + 1] = Math.random() * 0.5 + 0.3;
+      colors[i3 + 2] = 0;
+      
+      sizes[i] = Math.random() * 0.5 + 0.3;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 0.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending
+    });
+    
+    const particles = new THREE.Points(geometry, material);
+    this.scene.add(particles);
+    
+    // Animate and remove particles
+    let opacity = 1;
+    const animateExplosion = () => {
+      opacity -= 0.05;
+      material.opacity = opacity;
+      
+      // Expand particles
+      const positions = geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < positions.length; i += 3) {
+        const dx = positions[i] - position.x;
+        const dy = positions[i + 1] - position.y;
+        const dz = positions[i + 2] - position.z;
+        positions[i] += dx * 0.1;
+        positions[i + 1] += dy * 0.1;
+        positions[i + 2] += dz * 0.1;
+      }
+      geometry.attributes.position.needsUpdate = true;
+      
+      if (opacity > 0) {
+        requestAnimationFrame(animateExplosion);
+      } else {
+        this.scene.remove(particles);
+        geometry.dispose();
+        material.dispose();
+      }
+    };
+    
+    animateExplosion();
   }
 }

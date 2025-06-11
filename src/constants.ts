@@ -64,3 +64,67 @@ export const ANIMATION_TIMINGS = {
   SCREEN_SHAKE: '0.3s ease-in-out',
   SCANLINES: '8s linear infinite'
 } as const;
+
+export enum PowerUpType {
+  RAPID_FIRE = 'RAPID_FIRE',
+  EXPLOSIVE_ARROWS = 'EXPLOSIVE_ARROWS',
+  SCORE_MULTIPLIER = 'SCORE_MULTIPLIER'
+}
+
+export const POWERUP_CONFIG = {
+  // Spawn configuration
+  SPAWN_INTERVAL: 15000, // 15 seconds between spawns
+  SPAWN_CHANCE: 0.7, // 70% chance to spawn when interval is reached
+  MAX_ACTIVE_POWERUPS: 3,
+  SPAWN_HEIGHT: 3,
+  SPAWN_RADIUS: 12,
+  
+  // Visual configuration
+  SIZE: 1,
+  ROTATION_SPEED: 2,
+  FLOAT_AMPLITUDE: 0.5,
+  FLOAT_SPEED: 2,
+  GLOW_INTENSITY: 2,
+  
+  // Collision detection
+  PICKUP_RADIUS: 2,
+  
+  // Power-up specific configurations
+  RAPID_FIRE: {
+    DURATION: 8000, // 8 seconds
+    ARROW_COOLDOWN_MULTIPLIER: 0.3, // 70% faster firing
+    COLOR: 0xFFFF00, // Yellow
+    ICON: '⚡',
+    NAME: 'RAPID FIRE'
+  },
+  
+  EXPLOSIVE_ARROWS: {
+    DURATION: 10000, // 10 seconds
+    EXPLOSION_RADIUS: 3,
+    EXPLOSION_DAMAGE_MULTIPLIER: 2,
+    COLOR: 0xFF4500, // Orange-red
+    ICON: '💥',
+    NAME: 'EXPLOSIVE ARROWS'
+  },
+  
+  SCORE_MULTIPLIER: {
+    DURATION: 12000, // 12 seconds
+    MULTIPLIER: 3,
+    COLOR: 0x00FF00, // Green
+    ICON: '×3',
+    NAME: 'TRIPLE SCORE'
+  }
+} as const;
+
+export const POWERUP_MESSAGES = {
+  PICKUP: {
+    [PowerUpType.RAPID_FIRE]: '|| R4P1D F1R3 4CT1V4T3D ||',
+    [PowerUpType.EXPLOSIVE_ARROWS]: '|| 3XPL0S1V3 4RR0WS L04D3D ||',
+    [PowerUpType.SCORE_MULTIPLIER]: '|| TR1PL3 SC0R3 3N4BL3D ||'
+  },
+  EXPIRE: {
+    [PowerUpType.RAPID_FIRE]: '|| R4P1D F1R3 3XP1R3D ||',
+    [PowerUpType.EXPLOSIVE_ARROWS]: '|| 3XPL0S1V3S D3PL3T3D ||',
+    [PowerUpType.SCORE_MULTIPLIER]: '|| SC0R3 B00ST 3ND3D ||'
+  }
+} as const;

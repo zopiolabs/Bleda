@@ -1,4 +1,4 @@
-import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG } from './constants';
+import { UI_STYLES, ANIMATION_TIMINGS, GAME_CONFIG, PowerUpType, POWERUP_CONFIG } from './constants';
 import { ROAST_MESSAGES, L33T_MESSAGES } from './messages';
 
 export class UIManager {
@@ -529,5 +529,100 @@ export class UIManager {
         congratsContainer.style.filter = '';
       }, 200);
     }, 1200);
+  }
+  
+  public showPowerUpMessage(message: string, type: PowerUpType): void {
+    // Create or get power-up message container
+    let messageContainer = document.getElementById('powerup-message');
+    if (!messageContainer) {
+      messageContainer = this.createUIContainer({
+        bottom: '100px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '24px',
+        fontWeight: 'bold',
+        textShadow: '0 0 20px currentColor',
+        letterSpacing: '3px',
+        textAlign: 'center',
+        zIndex: '1000',
+        opacity: '0',
+        transition: 'all 0.3s ease-out',
+        pointerEvents: 'none'
+      }, 'powerup-message');
+      document.body.appendChild(messageContainer);
+    }
+    
+    // Set color based on power-up type
+    const config = this.getPowerUpConfig(type);
+    messageContainer.style.color = `#${config.COLOR.toString(16).padStart(6, '0')}`;
+    messageContainer.textContent = message;
+    
+    // Animate in
+    messageContainer.style.opacity = '0';
+    messageContainer.style.transform = 'translateX(-50%) translateY(20px)';
+    
+    // Force reflow
+    messageContainer.offsetHeight;
+    
+    messageContainer.style.opacity = '1';
+    messageContainer.style.transform = 'translateX(-50%) translateY(0)';
+    
+    // Hide after delay
+    setTimeout(() => {
+      messageContainer.style.opacity = '0';
+      messageContainer.style.transform = 'translateX(-50%) translateY(-20px)';
+    }, 2000);
+  }
+  
+  private getPowerUpConfig(type: PowerUpType) {
+    switch (type) {
+      case PowerUpType.RAPID_FIRE:
+        return POWERUP_CONFIG.RAPID_FIRE;
+      case PowerUpType.EXPLOSIVE_ARROWS:
+        return POWERUP_CONFIG.EXPLOSIVE_ARROWS;
+      case PowerUpType.SCORE_MULTIPLIER:
+        return POWERUP_CONFIG.SCORE_MULTIPLIER;
+    }
+  }
+  
+  public updateActivePowerUps(activePowerUps: Array<{type: PowerUpType, remaining: number}>): void {
+    // Create or get active power-ups display
+    let powerUpsDisplay = document.getElementById('active-powerups');
+    if (!powerUpsDisplay) {
+      powerUpsDisplay = this.createUIContainer({
+        top: '200px',
+        left: '10px',
+        width: '250px',
+        background: UI_STYLES.CONTAINER_BG,
+        border: '2px solid #00ff00',
+        borderRadius: '10px',
+        padding: '15px',
+        display: activePowerUps.length > 0 ? 'block' : 'none'
+      }, 'active-powerups');
+      document.body.appendChild(powerUpsDisplay);
+    }
+    
+    if (activePowerUps.length === 0) {
+      powerUpsDisplay.style.display = 'none';
+      return;
+    }
+    
+    powerUpsDisplay.style.display = 'block';
+    powerUpsDisplay.innerHTML = `
+      <div style="color: #00ff00; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+        [[ 4CT1V3 P0W3R-UPS ]]
+      </div>
+      ${activePowerUps.map(powerUp => {
+        const config = this.getPowerUpConfig(powerUp.type);
+        const color = `#${config.COLOR.toString(16).padStart(6, '0')}`;
+        const seconds = Math.ceil(powerUp.remaining / 1000);
+        return `
+          <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="color: ${color}; font-size: 16px;">${config.ICON} ${config.NAME}</span>
+            <span style="color: ${color}; font-size: 14px; font-weight: bold;">${seconds}s</span>
+          </div>
+        `;
+      }).join('')}
+    `;
   }
 }
