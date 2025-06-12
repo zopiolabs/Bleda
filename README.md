@@ -1,4 +1,4 @@
-# 🏹 BLEDA: The Epic Horse Archery Game
+# 🏹 BLEDA: The Barely Epic Horse Archery Game
 
 <div align="center">
 
